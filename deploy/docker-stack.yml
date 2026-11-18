@@ -1,0 +1,305 @@
+# =============================================================================
+# DOCKER SWARM STACK SPECIFICATION (deploy/docker-stack.yml)
+# =============================================================================
+# Despliegue en modo Swarm para alta disponibilidad, escalado declarativo
+# y balanceo de carga mediante Docker Ingress Routing Mesh y Spring Cloud.
+#
+# Comandos de uso:
+#   1. Inicializar Swarm (si no está iniciado): docker swarm init
+#   2. Desplegar la pila:
+#      docker stack deploy -c deploy/docker-stack.yml sdcc
+#   3. Verificar estado:
+#      docker stack services sdcc
+#      docker stack ps sdcc
+#   4. Eliminar la pila:
+#      docker stack rm sdcc
+# =============================================================================
+
+services:
+  # ---------------------------------------------------------------------------
+  # BASE DE DATOS: POSTGRESQL PRIMARY (ESCRITURAS)
+  # Modo replicated: 1 sola réplica fija para persistencia central de escrituras
+  # ---------------------------------------------------------------------------
+  postgres-primary:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-admin}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-admin_demo_change_me}
+      POSTGRES_DB: ${POSTGRES_DB:-laboratorio}
+      REPLICATION_PASSWORD: ${REPLICATION_PASSWORD:-replica_demo_change_me}
+    command: [
+      "postgres",
+      "-c", "wal_level=replica",
+      "-c", "max_wal_senders=10",
+      "-c", "wal_keep_size=256MB",
+      "-c", "hot_standby=on"
+    ]
+    volumes:
+      - pg_primary_swarm_data:/var/lib/postgresql/data
+    configs:
+      - source: pg_init_replication
+        target: /docker-entrypoint-initdb.d/01-replication.sh
+        mode: 0755
+      - source: pg_init_schemas
+        target: /docker-entrypoint-initdb.d/02-init-schemas.sql
+        mode: 0644
+    ports:
+      - target: 5432
+        published: 5432
+        protocol: tcp
+        mode: ingress
+    networks:
+      - sdcc-swarm-network
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 5
+        window: 120s
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 1024M
+        reservations:
+          cpus: "0.2"
+          memory: 256M
+
+  # ---------------------------------------------------------------------------
+  # BASE DE DATOS: POSTGRESQL RÉPLICA 1 (LECTURAS BALANCEADAS)
+  # ---------------------------------------------------------------------------
+  postgres-replica1:
+    image: postgres:17
+    user: postgres
+    environment:
+      PGDATA: /var/lib/postgresql/data
+      PGPASSWORD: ${REPLICATION_PASSWORD:-replica_demo_change_me}
+    entrypoint: ["/bin/bash", "/scripts/start-replica.sh"]
+    volumes:
+      - pg_replica1_swarm_data:/var/lib/postgresql/data
+    configs:
+      - source: pg_start_replica
+        target: /scripts/start-replica.sh
+        mode: 0755
+    ports:
+      - target: 5432
+        published: 5433
+        protocol: tcp
+        mode: ingress
+    networks:
+      - sdcc-swarm-network
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 10
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 512M
+        reservations:
+          cpus: "0.1"
+          memory: 128M
+
+  # ---------------------------------------------------------------------------
+  # BASE DE DATOS: POSTGRESQL RÉPLICA 2 (LECTURAS BALANCEADAS)
+  # ---------------------------------------------------------------------------
+  postgres-replica2:
+    image: postgres:17
+    user: postgres
+    environment:
+      PGDATA: /var/lib/postgresql/data
+      PGPASSWORD: ${REPLICATION_PASSWORD:-replica_demo_change_me}
+    entrypoint: ["/bin/bash", "/scripts/start-replica.sh"]
+    volumes:
+      - pg_replica2_swarm_data:/var/lib/postgresql/data
+    configs:
+      - source: pg_start_replica
+        target: /scripts/start-replica.sh
+        mode: 0755
+    ports:
+      - target: 5432
+        published: 5434
+        protocol: tcp
+        mode: ingress
+    networks:
+      - sdcc-swarm-network
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 10
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 512M
+        reservations:
+          cpus: "0.1"
+          memory: 128M
+
+  # ---------------------------------------------------------------------------
+  # DISCOVERY SERVER: NETFLIX EUREKA
+  # ---------------------------------------------------------------------------
+  eureka-server:
+    image: sdcc/eureka-server:${IMAGE_TAG:-latest}
+    environment:
+      - SERVER_PORT=8761
+      - SPRING_PROFILES_ACTIVE=docker
+    ports:
+      - target: 8761
+        published: 8761
+        protocol: tcp
+        mode: ingress
+    networks:
+      - sdcc-swarm-network
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+        delay: 10s
+        max_attempts: 5
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 512M
+        reservations:
+          cpus: "0.1"
+          memory: 256M
+
+  # ---------------------------------------------------------------------------
+  # EDGE: SPRING CLOUD GATEWAY + LOADBALANCER
+  # Escalable de forma declarativa según tráfico ingress
+  # ---------------------------------------------------------------------------
+  api-gateway:
+    image: sdcc/api-gateway:${IMAGE_TAG:-latest}
+    environment:
+      - SERVER_PORT=8080
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka-server:8761/eureka/
+      - SPRING_PROFILES_ACTIVE=docker
+    ports:
+      - target: 8080
+        published: 8080
+        protocol: tcp
+        mode: ingress
+    networks:
+      - sdcc-swarm-network
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 5
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 512M
+        reservations:
+          cpus: "0.1"
+          memory: 256M
+
+  # ---------------------------------------------------------------------------
+  # MICROSERVICIO: ORDER SERVICE
+  # En Docker Swarm se escala declarativamente a 2 réplicas (o más con docker service scale)
+  # ---------------------------------------------------------------------------
+  order-service:
+    image: sdcc/order-service:${IMAGE_TAG:-latest}
+    environment:
+      - SERVER_PORT=8081
+      - INSTANCE_ID={{.Service.Name}}-{{.Task.Slot}}
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka-server:8761/eureka/
+      - DB_PRIMARY_URL=jdbc:postgresql://postgres-primary:5432/orders_db
+      - DB_REPLICA1_URL=jdbc:postgresql://postgres-replica1:5432/orders_db
+      - DB_REPLICA2_URL=jdbc:postgresql://postgres-replica2:5432/orders_db
+      - DB_USER=${POSTGRES_USER:-admin}
+      - DB_PASSWORD=${POSTGRES_PASSWORD:-admin_demo_change_me}
+      - SPRING_PROFILES_ACTIVE=docker
+    ports:
+      - target: 8081
+        published: 8081
+        protocol: tcp
+        mode: ingress
+    networks:
+      - sdcc-swarm-network
+    deploy:
+      replicas: 2
+      update_config:
+        parallelism: 1
+        delay: 15s
+        order: start-first
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 5
+      resources:
+        limits:
+          cpus: "0.75"
+          memory: 512M
+        reservations:
+          cpus: "0.15"
+          memory: 256M
+
+  # ---------------------------------------------------------------------------
+  # MICROSERVICIO: INVENTORY SERVICE
+  # ---------------------------------------------------------------------------
+  inventory-service:
+    image: sdcc/inventory-service:${IMAGE_TAG:-latest}
+    environment:
+      - SERVER_PORT=8082
+      - INSTANCE_ID=inventory-service-{{.Task.Slot}}
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka-server:8761/eureka/
+      - DB_URL=jdbc:postgresql://postgres-primary:5432/inventory_db
+      - DB_USER=${POSTGRES_USER:-admin}
+      - DB_PASSWORD=${POSTGRES_PASSWORD:-admin_demo_change_me}
+      - SPRING_PROFILES_ACTIVE=docker
+    ports:
+      - target: 8082
+        published: 8082
+        protocol: tcp
+        mode: ingress
+    networks:
+      - sdcc-swarm-network
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 5
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 512M
+        reservations:
+          cpus: "0.1"
+          memory: 256M
+
+# -----------------------------------------------------------------------------
+# DOCKER CONFIGS: Inyección inmutable para Swarm
+# -----------------------------------------------------------------------------
+configs:
+  pg_init_replication:
+    file: ../docker/postgres/01-replication.sh
+  pg_init_schemas:
+    file: ../docker/postgres/02-init-schemas.sql
+  pg_start_replica:
+    file: ../docker/postgres/start-replica.sh
+
+# -----------------------------------------------------------------------------
+# REDES SWARM OVERLAY
+# -----------------------------------------------------------------------------
+networks:
+  sdcc-swarm-network:
+    driver: overlay
+    attachable: true
+
+# -----------------------------------------------------------------------------
+# VOLÚMENES PERSISTENTES
+# -----------------------------------------------------------------------------
+volumes:
+  pg_primary_swarm_data:
+    driver: local
+  pg_replica1_swarm_data:
+    driver: local
+  pg_replica2_swarm_data:
+    driver: local
