@@ -134,6 +134,21 @@ docker compose logs -f api-gateway
 docker compose logs -f order-service-1
 ```
 
+### Alternativa: Despliegue en Modo Clúster (Docker Swarm)
+Si deseas desplegar todo el clúster con alta disponibilidad, red overlay y escalado dinámico en **Docker Swarm**, dispones de los archivos listos en `deploy/`:
+```bash
+# 1. Construir las imágenes locales para Swarm
+./deploy/build-images.sh
+
+# 2. Inicializar Swarm y desplegar el stack
+./deploy/deploy-swarm.sh
+
+# 3. Monitorear servicios y réplicas
+docker stack services sdcc
+docker stack ps sdcc
+```
+Consulta la guía completa en [deploy/README.md](deploy/README.md).
+
 ---
 
 ## 5. Pruebas Experimentales Obligatorias (P01 a P08)
