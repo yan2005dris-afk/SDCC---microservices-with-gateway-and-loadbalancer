@@ -1,0 +1,29 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: api-gateway
+  cloud:
+    gateway:
+      discovery:
+        locator:
+          enabled: false
+      routes:
+        - id: service-a-route
+          uri: lb://service-a
+          predicates:
+            - Path=/api/service-a/**
+        - id: service-b-route
+          uri: lb://service-b
+          predicates:
+            - Path=/api/service-b/**
+
+eureka:
+  client:
+    service-url:
+      defaultZone: http://eureka-server:8761/eureka/
+    fetch-registry: true
+    register-with-eureka: true
+  instance:
+    prefer-ip-address: true
