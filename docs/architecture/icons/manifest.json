@@ -16,5 +16,11 @@
     "url": "https://svgl.app/library/docker.svg",
     "file": "docker.svg",
     "bytes": 1488
+  },
+  "client": {
+    "source": "lucide",
+    "url": "https://cdn.jsdelivr.net/npm/lucide-static/icons/laptop.svg",
+    "file": "client.svg",
+    "bytes": 479
   }
 }
