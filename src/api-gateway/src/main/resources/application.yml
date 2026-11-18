@@ -10,14 +10,14 @@ spring:
         locator:
           enabled: false
       routes:
-        - id: service-a-route
-          uri: lb://service-a
+        - id: order-service-route
+          uri: lb://order-service
           predicates:
-            - Path=/api/service-a/**
-        - id: service-b-route
-          uri: lb://service-b
+            - Path=/api/orders/**
+        - id: inventory-service-route
+          uri: lb://inventory-service
           predicates:
-            - Path=/api/service-b/**
+            - Path=/api/inventory/**
 
 eureka:
   client:

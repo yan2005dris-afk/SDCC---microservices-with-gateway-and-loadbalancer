@@ -1,0 +1,20 @@
+{
+  "spring": {
+    "source": "svgl",
+    "url": "https://svgl.app/library/spring.svg",
+    "file": "spring.svg",
+    "bytes": 741
+  },
+  "postgresql": {
+    "source": "svgl",
+    "url": "https://svgl.app/library/postgresql.svg",
+    "file": "postgresql.svg",
+    "bytes": 3944
+  },
+  "docker": {
+    "source": "svgl",
+    "url": "https://svgl.app/library/docker.svg",
+    "file": "docker.svg",
+    "bytes": 1488
+  }
+}

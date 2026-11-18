@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Arquitectura Distribuida - Microservicios & Replicación PostgreSQL",
+    "output": "distribuidos-architecture.html",
+    "quality_profile": "showcase"
+  },
+  "components": [
+    { "id": "client", "type": "external", "label": "HTTP Client", "sublabel": "curl / Bruno", "pos": [40, 250], "size": [130, 60] },
+    { "id": "gateway", "type": "cloud", "label": "Spring Cloud Gateway", "sublabel": "Port :8080", "pos": [240, 250], "size": [160, 60], "tag": "Reactive Proxy" },
+    { "id": "eureka", "type": "backend", "label": "Eureka Server", "sublabel": "Discovery :8761", "pos": [240, 90], "size": [160, 60], "tag": "Registry" },
+    { "id": "order1", "type": "backend", "label": "Order Service 1", "sublabel": "Instance 1 :8081", "pos": [480, 180], "size": [150, 60], "tag": "Dynamic Routing" },
+    { "id": "order2", "type": "backend", "label": "Order Service 2", "sublabel": "Instance 2 :8083", "pos": [480, 310], "size": [150, 60], "tag": "Dynamic Routing" },
+    { "id": "inventory", "type": "backend", "label": "Inventory Service", "sublabel": "Catalog :8082", "pos": [480, 440], "size": [150, 60], "tag": "Stock Mgmt" },
+    { "id": "pg-primary", "type": "database", "label": "PostgreSQL Primary", "sublabel": "Write :5432", "pos": [720, 180], "size": [160, 60], "tag": "WAL Master" },
+    { "id": "pg-replica1", "type": "database", "label": "PostgreSQL Replica 1", "sublabel": "Read :5433", "pos": [940, 110], "size": [160, 60], "tag": "Hot Standby" },
+    { "id": "pg-replica2", "type": "database", "label": "PostgreSQL Replica 2", "sublabel": "Read :5434", "pos": [940, 250], "size": [160, 60], "tag": "Hot Standby" }
+  ],
+  "boundaries": [
+    { "kind": "region", "label": "Docker Compose Virtual Network (sdcc-network)", "wraps": ["gateway", "eureka", "order1", "order2", "inventory", "pg-primary", "pg-replica1", "pg-replica2"] },
+    { "kind": "security-group", "label": "PostgreSQL Replicated Cluster (Physical WAL)", "wraps": ["pg-primary", "pg-replica1", "pg-replica2"] }
+  ],
+  "connections": [
+    { "id": "client-gw", "from": "client", "to": "gateway", "label": "HTTP :8080", "variant": "emphasis" },
+    { "id": "gw-eureka", "from": "gateway", "to": "eureka", "label": "Discovery Query", "variant": "dashed" },
+    { "id": "gw-order1", "from": "gateway", "to": "order1", "label": "lb://order-service (50%)" },
+    { "id": "gw-order2", "from": "gateway", "to": "order2", "label": "lb://order-service (50%)" },
+    { "id": "gw-inv", "from": "gateway", "to": "inventory", "label": "lb://inventory-service" },
+    { "id": "order1-inv", "from": "order1", "to": "inventory", "label": "RPC Stock Check", "variant": "dashed" },
+    { "id": "order2-inv", "from": "order2", "to": "inventory", "label": "RPC Stock Check", "variant": "dashed" },
+    { "id": "order1-primary", "from": "order1", "to": "pg-primary", "label": "Writes / Critical Reads" },
+    { "id": "order2-primary", "from": "order2", "to": "pg-primary", "label": "Writes / Critical Reads" },
+    { "id": "wal-rep1", "from": "pg-primary", "to": "pg-replica1", "label": "WAL Stream", "variant": "emphasis" },
+    { "id": "wal-rep2", "from": "pg-primary", "to": "pg-replica2", "label": "WAL Stream", "variant": "emphasis" }
+  ],
+  "cards": [
+    { "dot": "cyan", "title": "Descubrimiento & Gateway", "items": ["Eureka Server para registro dinámico de instancias", "Gateway con Spring Cloud LoadBalancer"] },
+    { "dot": "emerald", "title": "Microservicios de Negocio", "items": ["order-service con 2 instancias balanceadas", "inventory-service con control de stock", "Comunicación RPC vía nombres lógicos"] },
+    { "dot": "amber", "title": "Persistencia Replicada", "items": ["1 Primary (Escrituras) + 2 Réplicas (Lecturas balanceadas)", "Replicación física streaming WAL", "AbstractRoutingDataSource con tolerancia a fallos"] }
+  ]
+}
