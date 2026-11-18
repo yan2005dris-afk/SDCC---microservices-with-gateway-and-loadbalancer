@@ -1,0 +1,90 @@
+### ==============================================================================
+### SDCC - APLICACIONES DISTRIBUIDAS (PRUEBAS EXPERIMENTALES P01 - P08)
+### Gateway URL: http://localhost:8080
+### Eureka URL:  http://localhost:8761
+### ==============================================================================
+
+@baseUrl = http://localhost:8080
+@eurekaUrl = http://localhost:8761
+
+### ------------------------------------------------------------------------------
+### P01: Descubrimiento Dinámico - Dashboard & Registry de Eureka
+### ------------------------------------------------------------------------------
+# 1.1 Consultar estado del registro de Eureka (Apps registradas)
+GET {{eurekaUrl}}/eureka/apps
+Accept: application/json
+
+###
+# 1.2 Healthcheck del Gateway
+GET {{baseUrl}}/actuator/health
+
+### ------------------------------------------------------------------------------
+### Consultas previas de Inventario (Servicio B)
+### ------------------------------------------------------------------------------
+# Consultar stock de PROD-001 (Laptop Dell)
+GET {{baseUrl}}/api/inventory/PROD-001
+
+###
+# Consultar stock de PROD-002 (Monitor LG)
+GET {{baseUrl}}/api/inventory/PROD-002
+
+### ------------------------------------------------------------------------------
+### P04 & P05: Creación de Pedido (Escritura en PostgreSQL Primary + RPC a Inventario)
+### ------------------------------------------------------------------------------
+# 4.1 Crear pedido exitoso (valida stock en inventory-service y persiste en PRIMARY)
+# @name createOrderSuccess
+POST {{baseUrl}}/api/orders
+Content-Type: application/json
+
+{
+  "customerName": "Yandris Rivera",
+  "customerEmail": "yan.2005dris@gmail.com",
+  "productCode": "PROD-001",
+  "quantity": 2,
+  "unitPrice": 1899.99
+}
+
+###
+# 4.2 Intentar crear pedido con stock insuficiente (debe responder 400 Bad Request)
+POST {{baseUrl}}/api/orders
+Content-Type: application/json
+
+{
+  "customerName": "Cliente Sin Stock",
+  "customerEmail": "sin_stock@correo.com",
+  "productCode": "PROD-001",
+  "quantity": 9999,
+  "unitPrice": 1899.99
+}
+
+### ------------------------------------------------------------------------------
+### P07: Consistencia de Lectura Crítica Inmediata (Read-Your-Writes)
+### ------------------------------------------------------------------------------
+# Consultar inmediatamente el pedido creado forzando lectura en PRIMARY (evita replication lag)
+GET {{baseUrl}}/api/orders/1
+X-Consistency: critical
+
+### ------------------------------------------------------------------------------
+### P02, P05, P06, P08: Lecturas Ordinarias Balanceadas entre Réplicas (Round-Robin)
+### ------------------------------------------------------------------------------
+# Ejecutar consecutivamente para observar la alternancia de X-Database-Node:
+# Petición A -> Esperado: REPLICA_1 (y X-Instance-Id: order-service-1 o 2)
+GET {{baseUrl}}/api/orders
+
+###
+# Petición B -> Esperado: REPLICA_2 (y X-Instance-Id: order-service-2 o 1)
+GET {{baseUrl}}/api/orders
+
+###
+# Petición C -> Esperado: REPLICA_1 (Rotación circular Round-Robin continua)
+GET {{baseUrl}}/api/orders
+
+### ------------------------------------------------------------------------------
+### Pruebas de Resiliencia: Circuit Breaker Fallback
+### ------------------------------------------------------------------------------
+# Probar el fallback controlado del Circuit Breaker si order-service cae
+GET {{baseUrl}}/fallback/orders
+
+###
+# Probar el fallback controlado del Circuit Breaker si inventory-service cae
+GET {{baseUrl}}/fallback/inventory
