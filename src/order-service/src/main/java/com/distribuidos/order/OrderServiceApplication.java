@@ -13,13 +13,13 @@ import org.springframework.web.client.RestClient;
 @EnableScheduling
 public class OrderServiceApplication {
 
-    public static void main(String[] args) {
-        SpringApplication.run(OrderServiceApplication.class, args);
-    }
+  public static void main(String[] args) {
+    SpringApplication.run(OrderServiceApplication.class, args);
+  }
 
-    @Bean
-    @LoadBalanced
-    public RestClient.Builder restClientBuilder() {
-        return RestClient.builder();
-    }
+  @Bean
+  @LoadBalanced
+  public RestClient.Builder restClientBuilder() {
+    return RestClient.builder();
+  }
 }

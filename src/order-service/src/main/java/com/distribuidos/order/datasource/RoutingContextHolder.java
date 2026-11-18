@@ -2,19 +2,19 @@ package com.distribuidos.order.datasource;
 
 public final class RoutingContextHolder {
 
-    private static final ThreadLocal<DataSourceType> CONTEXT = new ThreadLocal<>();
+  private static final ThreadLocal<DataSourceType> CONTEXT = new ThreadLocal<>();
 
-    private RoutingContextHolder() {}
+  private RoutingContextHolder() {}
 
-    public static void set(DataSourceType type) {
-        CONTEXT.set(type);
-    }
+  public static void set(DataSourceType type) {
+    CONTEXT.set(type);
+  }
 
-    public static DataSourceType get() {
-        return CONTEXT.get();
-    }
+  public static DataSourceType get() {
+    return CONTEXT.get();
+  }
 
-    public static void clear() {
-        CONTEXT.remove();
-    }
+  public static void clear() {
+    CONTEXT.remove();
+  }
 }
