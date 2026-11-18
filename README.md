@@ -179,9 +179,14 @@ El proyecto incluye suites listas para ejecutar en [tests/http/api-tests.http](t
 
 ---
 
-## 8. Autoría y Licencia
+## 8. Autoría y Equipo de Trabajo
 
-Desarrollado para la asignatura de **Aplicaciones Distribuidas**:
-- **Autor:** Yandris Rivera Torres (`yan.2005dris@gmail.com`)
+Proyecto desarrollado para la asignatura de **Aplicaciones Distribuidas (SDCC)**:
+
+- **Yandris Rivera Torres** (`yan.2005dris@gmail.com`)
+- **Gino Bermúdez**
+- **Allison Reyes**
+- **Andy Alejandro**
+
 - **Repositorio:** [SDCC---microservices-with-gateway-and-loadbalancer](https://github.com/yan2005dris-afk/SDCC---microservices-with-gateway-and-loadbalancer)
 - **Licencia:** MIT
