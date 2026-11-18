@@ -1,0 +1,46 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Arquitectura Distribuida - Microservicios & Replicación PostgreSQL",
+    "output": "distribuidos-architecture.html",
+    "quality_profile": "showcase"
+  },
+  "components": [
+    { "id": "client", "type": "external", "label": "HTTP Client", "sublabel": "curl / Bruno", "pos": [30, 240], "size": [120, 60] },
+    { "id": "gateway", "type": "cloud", "label": "Spring Cloud Gateway", "sublabel": "Reverse Proxy :8080", "pos": [190, 240], "size": [150, 60], "tag": "Punto de Entrada" },
+    { "id": "eureka", "type": "backend", "label": "Eureka Server", "sublabel": "Discovery :8761", "pos": [190, 80], "size": [150, 60], "tag": "Service Registry" },
+    { "id": "lb-orders", "type": "cloud", "label": "Spring Cloud LoadBalancer", "sublabel": "lb://order-service", "pos": [380, 160], "size": [180, 54], "tag": "Client-Side LB (Orders)" },
+    { "id": "lb-inv", "type": "cloud", "label": "Spring Cloud LoadBalancer", "sublabel": "lb://inventory-service", "pos": [380, 360], "size": [180, 54], "tag": "Client-Side LB (Inventory)" },
+    { "id": "order1", "type": "backend", "label": "Order Service 1", "sublabel": "Instancia 1 :8081", "pos": [610, 110], "size": [140, 56], "tag": "Routing DataSource" },
+    { "id": "order2", "type": "backend", "label": "Order Service 2", "sublabel": "Instancia 2 :8083", "pos": [610, 210], "size": [140, 56], "tag": "Routing DataSource" },
+    { "id": "inventory", "type": "backend", "label": "Inventory Service", "sublabel": "Instancia Única :8082", "pos": [610, 360], "size": [140, 56], "tag": "Control de Stock" },
+    { "id": "pg-primary", "type": "database", "label": "PostgreSQL Primary", "sublabel": "Write :5432", "pos": [820, 160], "size": [150, 60], "tag": "WAL Master" },
+    { "id": "pg-replica1", "type": "database", "label": "PostgreSQL Replica 1", "sublabel": "Read :5433", "pos": [1020, 90], "size": [150, 60], "tag": "Hot Standby" },
+    { "id": "pg-replica2", "type": "database", "label": "PostgreSQL Replica 2", "sublabel": "Read :5434", "pos": [1020, 230], "size": [150, 60], "tag": "Hot Standby" }
+  ],
+  "boundaries": [
+    { "kind": "region", "label": "Docker Compose Virtual Network (sdcc-network)", "wraps": ["gateway", "eureka", "lb-orders", "lb-inv", "order1", "order2", "inventory", "pg-primary", "pg-replica1", "pg-replica2"] },
+    { "kind": "security-group", "label": "PostgreSQL Replicated Cluster (Exactamente 1 Primary + 2 Replicas)", "wraps": ["pg-primary", "pg-replica1", "pg-replica2"] }
+  ],
+  "connections": [
+    { "id": "c-gw", "from": "client", "to": "gateway", "label": "HTTP :8080", "variant": "emphasis" },
+    { "id": "gw-euk", "from": "gateway", "to": "eureka", "label": "Discovery Query", "variant": "dashed" },
+    { "id": "gw-lbo", "from": "gateway", "to": "lb-orders", "label": "Route: /api/orders/**" },
+    { "id": "gw-lbi", "from": "gateway", "to": "lb-inv", "label": "Route: /api/inventory/**" },
+    { "id": "lbo-ord1", "from": "lb-orders", "to": "order1", "label": "Round-Robin 50%" },
+    { "id": "lbo-ord2", "from": "lb-orders", "to": "order2", "label": "Round-Robin 50%" },
+    { "id": "lbi-inv", "from": "lb-inv", "to": "inventory", "label": "Direct dispatch" },
+    { "id": "ord-inv", "from": "order1", "to": "inventory", "label": "RPC Stock Check", "variant": "dashed" },
+    { "id": "ord1-pri", "from": "order1", "to": "pg-primary", "label": "Writes: orders_db" },
+    { "id": "ord2-pri", "from": "order2", "to": "pg-primary", "label": "Writes: orders_db" },
+    { "id": "inv-pri", "from": "inventory", "to": "pg-primary", "label": "Isolated: inventory_db", "variant": "dashed" },
+    { "id": "wal-r1", "from": "pg-primary", "to": "pg-replica1", "label": "WAL Stream", "variant": "emphasis" },
+    { "id": "wal-r2", "from": "pg-primary", "to": "pg-replica2", "label": "WAL Stream", "variant": "emphasis" }
+  ],
+  "cards": [
+    { "dot": "cyan", "title": "Punto de Entrada & Balanceo", "items": ["Spring Cloud Gateway con rutas declarativas", "Canales dedicados de Spring Cloud LoadBalancer (lb://order-service y lb://inventory-service)"] },
+    { "dot": "emerald", "title": "Microservicios de Negocio", "items": ["order-service con 2 instancias balanceadas 50/50", "inventory-service con catálogo y reservas atómicas", "Comunicación RPC desacoplada vía Eureka"] },
+    { "dot": "amber", "title": "Persistencia Replicada (1 Primary + 2 Réplicas)", "items": ["orders_db e inventory_db en el mismo clúster físico", "Replicación WAL automática para ambas bases", "Enrutamiento inteligente con AbstractRoutingDataSource"] }
+  ]
+}

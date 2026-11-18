@@ -1,0 +1,40 @@
+name: CI - Eureka Server
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'src/eureka-server/**'
+      - 'src/pom.xml'
+      - '.github/workflows/ci-eureka-server.yml'
+  pull_request:
+    branches: [ main, develop ]
+    paths:
+      - 'src/eureka-server/**'
+      - 'src/pom.xml'
+      - '.github/workflows/ci-eureka-server.yml'
+
+jobs:
+  build-and-test:
+    name: Lint, Format & Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+          cache: 'maven'
+
+      - name: Format Check (Spotless)
+        run: mvn -f src/pom.xml spotless:check -pl eureka-server
+
+      - name: Lint Analysis (Checkstyle)
+        run: mvn -f src/pom.xml checkstyle:check -pl eureka-server
+
+      - name: Compile and Run Tests
+        run: mvn -f src/pom.xml test -pl eureka-server

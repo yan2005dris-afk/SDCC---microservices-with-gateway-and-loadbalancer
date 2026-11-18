@@ -1,0 +1,20 @@
+meta {
+  name: 04 - Lectura Critica Inmediata (P07)
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{baseUrl}}/api/orders/1
+  body: none
+  auth: none
+}
+
+headers {
+  X-Consistency: critical
+}
+
+assert {
+  res.status: eq 200
+  res.headers["x-database-node"]: eq PRIMARY
+}
