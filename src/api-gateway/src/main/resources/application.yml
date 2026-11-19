@@ -5,6 +5,15 @@ spring:
   application:
     name: api-gateway
   cloud:
+    loadbalancer:
+      health-check:
+        initial-delay: 1s
+        interval: 5s
+        path:
+          default: /actuator/health
+      cache:
+        enabled: true
+        ttl: 5s
     gateway:
       discovery:
         locator:
@@ -61,8 +70,15 @@ eureka:
       defaultZone: ${EUREKA_CLIENT_SERVICEURL_DEFAULTZONE:http://localhost:8761/eureka/}
     fetch-registry: true
     register-with-eureka: true
+    registry-fetch-interval-seconds: 5
   instance:
     prefer-ip-address: true
+
+sdcc:
+  loadbalancer:
+    health-check-interval: 5s
+    health-check-path: /actuator/health
+    cache-ttl: 5s
 
 management:
   endpoints:
