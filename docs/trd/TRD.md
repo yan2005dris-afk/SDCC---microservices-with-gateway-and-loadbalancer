@@ -73,9 +73,9 @@ Para cumplir con la restricción de que `@Transactional(readOnly = true)` no bal
 
 3. **`DynamicRoutingDataSource` (Extiende `AbstractRoutingDataSource`):**
    - Inyecta un mapa de datasources:
-     - Clave `PRIMARY` -> `HikariDataSource` apuntando a `primary:5432`.
-     - Clave `REPLICA_1` -> `HikariDataSource` apuntando a `replica1:5432`.
-     - Clave `REPLICA_2` -> `HikariDataSource` apuntando a `replica2:5432`.
+     - Clave `PRIMARY` -> `HikariDataSource` apuntando a `postgres-primary:5432`.
+     - Clave `REPLICA_1` -> `HikariDataSource` apuntando a `postgres-replica1:5432`.
+     - Clave `REPLICA_2` -> `HikariDataSource` apuntando a `postgres-replica2:5432`.
    - Implementa `determineCurrentLookupKey()` extrayendo el valor del context holder.
 
 4. **`ReplicaManager` con Failover:**
@@ -99,7 +99,8 @@ Para cumplir con la restricción de que `@Transactional(readOnly = true)` no bal
    - Usuario de replicación: `replicator` con rol `REPLICATION` configurado en `pg_hba.conf`.
 
 2. **Nodos Replica 1 & Replica 2:**
-   - Inicializados con `pg_basebackup -h primary -D /var/lib/postgresql/data -U replicator -v -P -R -X stream`.
+   - Inicializados por `docker/postgres/start-replica.sh` con `pg_basebackup -h "$PRIMARY_HOST" -D /var/lib/postgresql/data -U replicator -P -R -X stream`, donde `PRIMARY_HOST` es el nombre del servicio primario en la red de contenedores (por defecto `postgres-primary`).
+   - Healthcheck de contenedor: `SELECT pg_is_in_recovery()` debe devolver `t`; así una réplica solo figura como `healthy` si acepta conexiones y opera como standby.
    - Creación automática de archivo `standby.signal`.
    - Modo `hot_standby = on` activo, permitiendo consultas SQL de solo lectura.
 

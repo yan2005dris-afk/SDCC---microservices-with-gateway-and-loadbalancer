@@ -1,0 +1,55 @@
+name: CI - Compose Smoke Test
+
+# Valida de extremo a extremo la infraestructura: credenciales, rol "replicator",
+# pg_hba.conf, replicación WAL (1 primario + 2 réplicas) y enrutamiento de lecturas
+# a réplicas a través del Gateway. Cubre lo que un healthcheck no puede verificar.
+# La lógica vive en scripts/ci/compose-smoke.sh para poder ejecutarla también en local.
+on:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'compose.yaml'
+      - 'docker/**'
+      - '.env.example'
+      - 'scripts/ci/compose-smoke.sh'
+      - 'src/**'
+      - '.github/workflows/ci-compose-smoke.yml'
+  pull_request:
+    branches: [ main, develop ]
+    paths:
+      - 'compose.yaml'
+      - 'docker/**'
+      - '.env.example'
+      - 'scripts/ci/compose-smoke.sh'
+      - 'src/**'
+      - '.github/workflows/ci-compose-smoke.yml'
+  workflow_dispatch:
+
+jobs:
+  compose-smoke:
+    name: Replicación y enrutamiento end-to-end
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Preparar variables de entorno de ejemplo
+        run: cp .env.example .env
+
+      - name: Levantar el clúster y esperar a que todo esté healthy
+        run: docker compose up -d --build --wait --wait-timeout 600
+
+      - name: Ejecutar smoke test
+        run: bash scripts/ci/compose-smoke.sh
+
+      - name: Estado y logs ante fallo
+        if: failure()
+        run: |
+          docker compose ps
+          docker compose logs --no-color --tail=200
+
+      - name: Limpiar entorno
+        if: always()
+        run: docker compose down -v

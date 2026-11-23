@@ -21,13 +21,20 @@ services:
       - pg_primary_data:/var/lib/postgresql/data
       - ./docker/postgres/01-replication.sh:/docker-entrypoint-initdb.d/01-replication.sh:ro
       - ./docker/postgres/02-init-schemas.sql:/docker-entrypoint-initdb.d/02-init-schemas.sql:ro
+    # Puerto del HOST configurable (5435 por defecto para no chocar con un PostgreSQL
+    # local en 5432). Dentro de la red sdcc-network los servicios siguen usando 5432.
     ports:
-      - "5432:5432"
+      - "${PG_PRIMARY_PORT:-5435}:5432"
+    # Comprobación por TCP (-h 127.0.0.1), igual que se conectan réplicas y servicios.
+    # Durante el init la imagen levanta un servidor temporal solo por socket local;
+    # así el primario no figura "healthy" hasta que el servidor definitivo escucha en red.
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-admin} -d ${POSTGRES_DB:-laboratorio}"]
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U ${POSTGRES_USER:-admin} -d ${POSTGRES_DB:-laboratorio}"]
       interval: 5s
       timeout: 3s
-      retries: 20
+      retries: 3
+      start_period: 60s
+    restart: unless-stopped
     networks:
       - sdcc-network
 
@@ -38,15 +45,28 @@ services:
     image: postgres:17
     container_name: postgres-replica1
     user: postgres
+    # Ante un error de configuración el script sale con exit 1: se reintenta 5 veces y se detiene
+    # (evita un bucle infinito de reinicios). "docker stop" manual se respeta (P06/P08).
+    restart: on-failure:5
     environment:
       PGDATA: /var/lib/postgresql/data
       PGPASSWORD: ${REPLICATION_PASSWORD:-replica_demo_change_me}
+      PRIMARY_HOST: postgres-primary
+      # Superusuario heredado del primario vía pg_basebackup; lo usa el healthcheck.
+      POSTGRES_USER: ${POSTGRES_USER:-admin}
     entrypoint: ["/bin/bash", "/scripts/start-replica.sh"]
     volumes:
       - pg_replica1_data:/var/lib/postgresql/data
       - ./docker/postgres/start-replica.sh:/scripts/start-replica.sh:ro
     ports:
-      - "5433:5432"
+      - "${PG_REPLICA1_PORT:-5433}:5432"
+    # Sana solo si acepta conexiones Y opera como réplica (en recuperación).
+    healthcheck:
+      test: ["CMD-SHELL", "psql -U \"$${POSTGRES_USER}\" -d postgres -tAc 'SELECT pg_is_in_recovery()' | grep -q t"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+      start_period: 60s
     depends_on:
       postgres-primary:
         condition: service_healthy
@@ -60,15 +80,26 @@ services:
     image: postgres:17
     container_name: postgres-replica2
     user: postgres
+    restart: on-failure:5
     environment:
       PGDATA: /var/lib/postgresql/data
       PGPASSWORD: ${REPLICATION_PASSWORD:-replica_demo_change_me}
+      PRIMARY_HOST: postgres-primary
+      # Superusuario heredado del primario vía pg_basebackup; lo usa el healthcheck.
+      POSTGRES_USER: ${POSTGRES_USER:-admin}
     entrypoint: ["/bin/bash", "/scripts/start-replica.sh"]
     volumes:
       - pg_replica2_data:/var/lib/postgresql/data
       - ./docker/postgres/start-replica.sh:/scripts/start-replica.sh:ro
     ports:
-      - "5434:5432"
+      - "${PG_REPLICA2_PORT:-5434}:5432"
+    # Sana solo si acepta conexiones Y opera como réplica (en recuperación).
+    healthcheck:
+      test: ["CMD-SHELL", "psql -U \"$${POSTGRES_USER}\" -d postgres -tAc 'SELECT pg_is_in_recovery()' | grep -q t"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+      start_period: 60s
     depends_on:
       postgres-primary:
         condition: service_healthy
@@ -89,10 +120,12 @@ services:
       - SERVER_PORT=8761
       - SPRING_PROFILES_ACTIVE=docker
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8761/actuator/health"]
+      test: ["CMD", "curl", "-fs", "http://localhost:8761/actuator/health"]
       interval: 10s
       timeout: 5s
-      retries: 10
+      retries: 3
+      start_period: 90s
+    restart: unless-stopped
     networks:
       - sdcc-network
 
@@ -110,8 +143,23 @@ services:
       - SERVER_PORT=8080
       - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka-server:8761/eureka/
       - SPRING_PROFILES_ACTIVE=docker
+    healthcheck:
+      test: ["CMD", "curl", "-fs", "http://localhost:8080/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 90s
+    # Reinicia si el proceso cae; un "docker stop" manual se respeta (P03).
+    restart: unless-stopped
+    # El Gateway recibe tráfico solo cuando hay instancias de negocio listas.
     depends_on:
       eureka-server:
+        condition: service_healthy
+      order-service-1:
+        condition: service_healthy
+      order-service-2:
+        condition: service_healthy
+      inventory-service:
         condition: service_healthy
     networks:
       - sdcc-network
@@ -136,8 +184,20 @@ services:
       - DB_USER=${POSTGRES_USER:-admin}
       - DB_PASSWORD=${POSTGRES_PASSWORD:-admin_demo_change_me}
       - SPRING_PROFILES_ACTIVE=docker
+    healthcheck:
+      test: ["CMD", "curl", "-fs", "http://localhost:8081/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 90s
+    # Reinicia si el proceso cae; un "docker stop" manual se respeta (P03).
+    restart: unless-stopped
     depends_on:
       postgres-primary:
+        condition: service_healthy
+      postgres-replica1:
+        condition: service_healthy
+      postgres-replica2:
         condition: service_healthy
       eureka-server:
         condition: service_healthy
@@ -164,8 +224,20 @@ services:
       - DB_USER=${POSTGRES_USER:-admin}
       - DB_PASSWORD=${POSTGRES_PASSWORD:-admin_demo_change_me}
       - SPRING_PROFILES_ACTIVE=docker
+    healthcheck:
+      test: ["CMD", "curl", "-fs", "http://localhost:8081/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 90s
+    # Reinicia si el proceso cae; un "docker stop" manual se respeta (P03).
+    restart: unless-stopped
     depends_on:
       postgres-primary:
+        condition: service_healthy
+      postgres-replica1:
+        condition: service_healthy
+      postgres-replica2:
         condition: service_healthy
       eureka-server:
         condition: service_healthy
@@ -190,6 +262,14 @@ services:
       - DB_USER=${POSTGRES_USER:-admin}
       - DB_PASSWORD=${POSTGRES_PASSWORD:-admin_demo_change_me}
       - SPRING_PROFILES_ACTIVE=docker
+    healthcheck:
+      test: ["CMD", "curl", "-fs", "http://localhost:8082/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 90s
+    # Reinicia si el proceso cae; un "docker stop" manual se respeta (P03).
+    restart: unless-stopped
     depends_on:
       postgres-primary:
         condition: service_healthy
