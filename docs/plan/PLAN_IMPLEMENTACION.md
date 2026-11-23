@@ -89,7 +89,9 @@ flowchart LR
 
 ## B1 · `fix/postgres-replica-bootstrap`
 
-**Tareas:** INF-01, INF-02, INF-03 · **Base:** `develop` · **Bloquea:** P05, P06, P08
+**Tareas:** INF-01, INF-02, INF-03, GW-01 · **Base:** `develop` · **Bloquea:** P05, P06, P08
+
+> **Estado:** ✅ implementado y verificado (18 pasos de prueba manuales + smoke test) en los commits `9e315d8` (infra) y `ce16d7e` (gateway). **Pendiente:** push, PR y merge en `develop`.
 
 ### Objetivo
 Que las dos réplicas hagan `pg_basebackup` contra el primario, queden en `streaming` y que Compose arranque los servicios en el orden correcto.
@@ -100,27 +102,32 @@ Que las dos réplicas hagan `pg_basebackup` contra el primario, queden en `strea
 - `order-service-*` debe depender de que las réplicas estén `healthy`. No es obligatorio, porque el balanceador tolera su ausencia, pero evita ruido en el arranque.
 
 ### Checklist
-- [ ] `docker/postgres/start-replica.sh`: usar `-h "${PRIMARY_HOST:-postgres-primary}"`.
-- [ ] `compose.yaml` y `deploy/docker-stack.yml`: definir `PRIMARY_HOST=postgres-primary` en ambas réplicas.
-- [ ] `healthcheck` en `postgres-replica1` y `postgres-replica2`:
-  ```yaml
-  healthcheck:
-    test: ["CMD-SHELL", "psql -U $${POSTGRES_USER:-admin} -d postgres -tAc 'SELECT pg_is_in_recovery()' | grep -q t"]
-    interval: 5s
-    timeout: 3s
-    retries: 30
-  ```
-  Las réplicas no definen `POSTGRES_USER`: hay que pasarles la variable o usar el usuario `postgres` con `PGPASSWORD`.
-- [ ] `healthcheck` HTTP (`/actuator/health`) en `order-service-1`, `order-service-2` e `inventory-service` (INF-03). La imagen ya incluye `curl`.
-- [ ] `depends_on` de `api-gateway` → `order-service-*` e `inventory-service` en `condition: service_healthy`.
-- [ ] Crear `.env.example` en la raíz con `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB` y `REPLICATION_PASSWORD` con valores ficticios (INF-02). Confirmar que `.gitignore` ignora `.env`; ya lo hace.
-- [ ] TRD §4: corregir `pg_basebackup -h primary`.
+- [x] `docker/postgres/start-replica.sh`: usar `-h "${PRIMARY_HOST:-postgres-primary}"`.
+- [x] `compose.yaml` y `deploy/docker-stack.yml`: definir `PRIMARY_HOST=postgres-primary` en ambas réplicas.
+- [x] `healthcheck` en `postgres-replica1` y `postgres-replica2` con `SELECT pg_is_in_recovery()`. Se les pasa `POSTGRES_USER`, que es el superusuario heredado del primario.
+- [x] `healthcheck` HTTP (`/actuator/health`) en `order-service-1`, `order-service-2`, `inventory-service` y `api-gateway` (INF-03).
+- [x] `depends_on` de `api-gateway` → `order-service-*` e `inventory-service` en `condition: service_healthy`; `order-service-*` → réplicas `healthy`.
+- [x] Crear `.env.example` en la raíz con valores ficticios (INF-02). `.gitignore` ya ignora `.env`.
+- [x] TRD §4: corregir `pg_basebackup -h primary`.
+
+**Añadido durante la implementación:**
+- [x] Healthcheck del primario por TCP (`pg_isready -h 127.0.0.1`). Así no se marca sano mientras corre el servidor temporal de inicialización y desaparece el `Connection refused` inicial.
+- [x] `start-replica.sh`: reintenta solo los errores transitorios y aborta con `exit 1` ante errores de configuración (credenciales, rol, `pg_hba.conf`).
+- [x] Healthchecks con `start_period` + `retries: 3`: una caída se detecta en ~15 s en vez de 100–150 s.
+- [x] Políticas de reinicio: `unless-stopped` en los servicios y `on-failure:5` en las réplicas.
+- [x] Puertos del host configurables (`PG_PRIMARY_PORT`, etc.); el primario usa 5435 por defecto para no chocar con un PostgreSQL local.
+- [x] Smoke test end-to-end: `scripts/ci/compose-smoke.sh` + `.github/workflows/ci-compose-smoke.yml`.
+- [x] **GW-01:** cabeceras de trazabilidad del Gateway registradas con `beforeCommit`, con tests (detectado por el smoke test).
 
 ### Verificación
-- [ ] `docker compose down -v && docker compose up -d --build`. El `-v` es necesario para que se vuelvan a ejecutar los scripts de inicialización.
-- [ ] `docker compose ps`: todos los contenedores en `healthy`.
-- [ ] En el primario, `SELECT client_addr, state, sync_state FROM pg_stat_replication;` devuelve 2 filas en estado `streaming`.
-- [ ] Escribir en el primario y leer en cada réplica: el dato aparece.
+- [x] `docker compose down -v && docker compose up -d --build --wait`: todo levanta.
+- [x] `docker compose ps`: los 8 contenedores en `healthy`.
+- [x] `pg_stat_replication` devuelve 2 filas en `streaming`, y las réplicas devuelven `pg_is_in_recovery() = t`.
+- [x] Los datos del primario aparecen en las dos réplicas, y una escritura en una réplica es rechazada.
+- [x] Las lecturas por el Gateway llegan a `REPLICA_1` y `REPLICA_2`; `curl` termina con `rc=0` y con las cabeceras de trazabilidad.
+- [x] Fallo rápido con contraseña incorrecta (`exit 1`) y reintento ante un primario no disponible.
+- [x] Reinicio automático cuando el proceso cae; un `docker stop` manual se respeta.
+- [x] Una réplica detenida y reiniciada vuelve a `healthy` y a `streaming` sin repetir la copia inicial.
 
 ---
 
@@ -490,14 +497,16 @@ Hoy el esquema de **ambos** servicios se define en un único `02-init-schemas.sq
 
 ## Checklist global de tareas
 
-Marca cada tarea cuando su rama esté **fusionada en `develop`**.
+Marca cada tarea cuando esté **implementada y verificada en su rama**.
 
 ### Infraestructura — B1 `fix/postgres-replica-bootstrap`
-- [ ] **INF-01** Las réplicas arrancan y replican (`pg_basebackup` contra `postgres-primary`)
-- [ ] **INF-02** `.env.example` en la raíz
-- [ ] **INF-03** Healthchecks de los servicios y las réplicas en Compose
-- [ ] **GW-01** El Gateway ya no corta las respuestas; cabeceras de trazabilidad registradas con `beforeCommit`
-- [ ] Smoke test de Compose (`scripts/ci/compose-smoke.sh` + `ci-compose-smoke.yml`)
+> Implementado y verificado en `9e315d8` y `ce16d7e`.
+
+- [x] **INF-01** Las réplicas arrancan y replican (`pg_basebackup` contra `postgres-primary`)
+- [x] **INF-02** `.env.example` en la raíz
+- [x] **INF-03** Healthchecks de los servicios y las réplicas en Compose
+- [x] **GW-01** El Gateway ya no corta las respuestas; cabeceras de trazabilidad registradas con `beforeCommit`
+- [x] Smoke test de Compose (`scripts/ci/compose-smoke.sh` + `ci-compose-smoke.yml`)
 
 ### order-service
 - [ ] **ORD-01** El failover de `GET /api/orders` no devuelve 500 — *B2*
