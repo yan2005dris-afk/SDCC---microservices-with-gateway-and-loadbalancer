@@ -1,9 +1,13 @@
 server:
   port: ${SERVER_PORT:8082}
+  # Apagado ordenado: termina las reservas de stock en curso antes de cerrar.
+  shutdown: graceful
 
 spring:
   application:
     name: inventory-service
+  lifecycle:
+    timeout-per-shutdown-phase: 20s
   datasource:
     url: ${DB_URL:jdbc:postgresql://localhost:5432/inventory_db}
     username: ${DB_USER:admin}

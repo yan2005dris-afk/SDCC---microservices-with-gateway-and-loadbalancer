@@ -1,9 +1,15 @@
 server:
   port: ${SERVER_PORT:8081}
+  # Apagado ordenado: al recibir SIGTERM deja de aceptar peticiones nuevas y
+  # termina las que están en curso antes de cerrar.
+  shutdown: graceful
 
 spring:
   application:
     name: order-service
+  lifecycle:
+    # Tiempo máximo para drenar las peticiones en curso.
+    timeout-per-shutdown-phase: 20s
   jpa:
     hibernate:
       ddl-auto: update
@@ -30,3 +36,11 @@ management:
   endpoint:
     health:
       show-details: always
+
+sdcc:
+  shutdown:
+    # Al apagarse, la instancia se marca DOWN en Eureka y espera este tiempo antes de
+    # drenar, para que el Gateway deje de enviarle peticiones nuevas. Peor caso de
+    # propagación ≈ 12 s: caché de Eureka (2 s) + fetch del registro (5 s) + caché del
+    # LoadBalancer (5 s); medido ≈ 9,3 s. 15 s deja margen. 0s lo desactiva.
+    drain-delay: ${SDCC_SHUTDOWN_DRAIN_DELAY:15s}
