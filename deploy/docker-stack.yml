@@ -43,9 +43,16 @@ services:
       - source: pg_init_schemas
         target: /docker-entrypoint-initdb.d/02-init-schemas.sql
         mode: 0644
+    # Comprobación por TCP: no figura sana mientras corre el servidor temporal del init.
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+      start_period: 60s
     ports:
       - target: 5432
-        published: 5432
+        published: ${PG_PRIMARY_PORT:-5435}
         protocol: tcp
         mode: ingress
     networks:
@@ -74,6 +81,8 @@ services:
     environment:
       PGDATA: /var/lib/postgresql/data
       PGPASSWORD: ${REPLICATION_PASSWORD:-replica_demo_change_me}
+      PRIMARY_HOST: postgres-primary
+      POSTGRES_USER: ${POSTGRES_USER:-admin}
     entrypoint: ["/bin/bash", "/scripts/start-replica.sh"]
     volumes:
       - pg_replica1_swarm_data:/var/lib/postgresql/data
@@ -81,9 +90,15 @@ services:
       - source: pg_start_replica
         target: /scripts/start-replica.sh
         mode: 0755
+    healthcheck:
+      test: ["CMD-SHELL", "psql -U \"$${POSTGRES_USER}\" -d postgres -tAc 'SELECT pg_is_in_recovery()' | grep -q t"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+      start_period: 60s
     ports:
       - target: 5432
-        published: 5433
+        published: ${PG_REPLICA1_PORT:-5433}
         protocol: tcp
         mode: ingress
     networks:
@@ -111,6 +126,8 @@ services:
     environment:
       PGDATA: /var/lib/postgresql/data
       PGPASSWORD: ${REPLICATION_PASSWORD:-replica_demo_change_me}
+      PRIMARY_HOST: postgres-primary
+      POSTGRES_USER: ${POSTGRES_USER:-admin}
     entrypoint: ["/bin/bash", "/scripts/start-replica.sh"]
     volumes:
       - pg_replica2_swarm_data:/var/lib/postgresql/data
@@ -118,9 +135,15 @@ services:
       - source: pg_start_replica
         target: /scripts/start-replica.sh
         mode: 0755
+    healthcheck:
+      test: ["CMD-SHELL", "psql -U \"$${POSTGRES_USER}\" -d postgres -tAc 'SELECT pg_is_in_recovery()' | grep -q t"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+      start_period: 60s
     ports:
       - target: 5432
-        published: 5434
+        published: ${PG_REPLICA2_PORT:-5434}
         protocol: tcp
         mode: ingress
     networks:
@@ -215,6 +238,13 @@ services:
       - DB_USER=${POSTGRES_USER:-admin}
       - DB_PASSWORD=${POSTGRES_PASSWORD:-admin_demo_change_me}
       - SPRING_PROFILES_ACTIVE=docker
+    # Necesario para que update_config "start-first" espere a la nueva tarea sana.
+    healthcheck:
+      test: ["CMD", "curl", "-fs", "http://localhost:8081/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 90s
     ports:
       - target: 8081
         published: 8081
@@ -253,6 +283,12 @@ services:
       - DB_USER=${POSTGRES_USER:-admin}
       - DB_PASSWORD=${POSTGRES_PASSWORD:-admin_demo_change_me}
       - SPRING_PROFILES_ACTIVE=docker
+    healthcheck:
+      test: ["CMD", "curl", "-fs", "http://localhost:8082/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 90s
     ports:
       - target: 8082
         published: 8082

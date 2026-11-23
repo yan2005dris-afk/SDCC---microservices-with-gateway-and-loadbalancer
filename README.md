@@ -59,7 +59,7 @@ El sistema implementa un dominio de comercio electrónico ligero compuesto por d
 | **Order Service (Instancia 1)** | `order-service-1` | `8081` | Transaccional, enrutamiento `AbstractRoutingDataSource`. |
 | **Order Service (Instancia 2)** | `order-service-2` | `8083` | Instancia balanceada para alta disponibilidad HTTP. |
 | **Inventory Service** | `inventory-service` | `8082` | Catálogo de productos y reserva de stock atómica. |
-| **PostgreSQL Primary** | `postgres-primary` | `5432` | Nodo maestro para escrituras y emisión de streaming WAL. |
+| **PostgreSQL Primary** | `postgres-primary` | `5435` (configurable con `PG_PRIMARY_PORT`) | Nodo maestro para escrituras y emisión de streaming WAL. |
 | **PostgreSQL Réplica 1** | `postgres-replica1` | `5433` | Réplica física de solo lectura (`hot_standby = on`). |
 | **PostgreSQL Réplica 2** | `postgres-replica2` | `5434` | Réplica física de solo lectura (`hot_standby = on`). |
 

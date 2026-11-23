@@ -1,16 +1,28 @@
 package com.distribuidos.gateway.filter;
 
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.cloud.gateway.filter.GatewayFilterChain;
 import org.springframework.cloud.gateway.filter.GlobalFilter;
 import org.springframework.core.Ordered;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.server.reactive.ServerHttpRequest;
+import org.springframework.http.server.reactive.ServerHttpResponse;
 import org.springframework.stereotype.Component;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
 
+/**
+ * Filtro global de trazabilidad: propaga {@code X-Correlation-Id} hacia los microservicios y
+ * devuelve al cliente el mismo identificador junto con la latencia medida en el Gateway.
+ *
+ * <p>Las cabeceras de respuesta se registran con {@link ServerHttpResponse#beforeCommit}, que se
+ * ejecuta justo antes de enviar el estado y las cabeceras al cliente. Escribirlas después de la
+ * cadena de filtros no es válido: para entonces la respuesta ya está confirmada, sus cabeceras son
+ * de solo lectura y la conexión se cierra sin completar el cuerpo.
+ */
 @Component
 public class LoggingAndTracingGlobalFilter implements GlobalFilter, Ordered {
 
@@ -18,69 +30,55 @@ public class LoggingAndTracingGlobalFilter implements GlobalFilter, Ordered {
 
   public static final String CORRELATION_ID_HEADER = "X-Correlation-Id";
   public static final String RESPONSE_TIME_HEADER = "X-Response-Time-Ms";
-  private static final String START_TIME_ATTR = "startTimeMs";
 
   @Override
   public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
-    long startTime = System.currentTimeMillis();
-    exchange.getAttributes().put(START_TIME_ATTR, startTime);
+    long startNanos = System.nanoTime();
+    String correlationId = resolveCorrelationId(exchange.getRequest().getHeaders());
 
-    // 1. Extraer o generar X-Correlation-Id
-    HttpHeaders headers = exchange.getRequest().getHeaders();
-    String correlationId = headers.getFirst(CORRELATION_ID_HEADER);
-    if (correlationId == null || correlationId.isBlank()) {
-      correlationId = UUID.randomUUID().toString();
-    }
+    ServerHttpRequest request =
+        exchange.getRequest().mutate().header(CORRELATION_ID_HEADER, correlationId).build();
+    ServerWebExchange mutatedExchange = exchange.mutate().request(request).build();
+    ServerHttpResponse response = mutatedExchange.getResponse();
 
-    final String finalCorrelationId = correlationId;
+    response.beforeCommit(
+        () -> {
+          HttpHeaders headers = response.getHeaders();
+          headers.set(CORRELATION_ID_HEADER, correlationId);
+          headers.set(RESPONSE_TIME_HEADER, String.valueOf(elapsedMillis(startNanos)));
+          return Mono.empty();
+        });
 
-    // Propagar Correlation ID hacia los microservicios downstream
-    ServerWebExchange mutatedExchange =
-        exchange
-            .mutate()
-            .request(
-                exchange
-                    .getRequest()
-                    .mutate()
-                    .header(CORRELATION_ID_HEADER, finalCorrelationId)
-                    .build())
-            .build();
+    log.info(
+        "[GATEWAY START] TraceId: {} -> {} {}",
+        correlationId,
+        request.getMethod().name(),
+        request.getURI().getPath());
 
-    String path = exchange.getRequest().getURI().getPath();
-    String method = exchange.getRequest().getMethod().name();
-
-    log.info("[GATEWAY START] TraceId: {} -> {} {}", finalCorrelationId, method, path);
-
-    // 2. Post-Filter: Calcular latencia e inyectar cabeceras en la respuesta al cliente
     return chain
         .filter(mutatedExchange)
-        .then(
-            Mono.fromRunnable(
-                () -> {
-                  Long start = mutatedExchange.getAttribute(START_TIME_ATTR);
-                  long latency = (start != null) ? (System.currentTimeMillis() - start) : 0;
-
-                  mutatedExchange
-                      .getResponse()
-                      .getHeaders()
-                      .add(CORRELATION_ID_HEADER, finalCorrelationId);
-                  mutatedExchange
-                      .getResponse()
-                      .getHeaders()
-                      .add(RESPONSE_TIME_HEADER, String.valueOf(latency));
-
-                  var statusCode = mutatedExchange.getResponse().getStatusCode();
-                  log.info(
-                      "[GATEWAY END] TraceId: {} -> Status: {} en {} ms",
-                      finalCorrelationId,
-                      statusCode,
-                      latency);
-                }));
+        .doFinally(
+            signal ->
+                log.info(
+                    "[GATEWAY END] TraceId: {} -> Status: {} en {} ms ({})",
+                    correlationId,
+                    response.getStatusCode(),
+                    elapsedMillis(startNanos),
+                    signal));
   }
 
   @Override
   public int getOrder() {
     // Ejecución prioritaria al inicio de la cadena de filtros reactivos
     return Ordered.HIGHEST_PRECEDENCE;
+  }
+
+  private static String resolveCorrelationId(HttpHeaders headers) {
+    String incoming = headers.getFirst(CORRELATION_ID_HEADER);
+    return (incoming == null || incoming.isBlank()) ? UUID.randomUUID().toString() : incoming;
+  }
+
+  private static long elapsedMillis(long startNanos) {
+    return TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startNanos);
   }
 }
