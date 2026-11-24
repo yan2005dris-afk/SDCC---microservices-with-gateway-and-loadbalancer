@@ -26,6 +26,14 @@ import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
+/**
+ * Pruebas de integración con PostgreSQL real.
+ *
+ * <p>Con Docker disponible, {@code mvn verify -pl inventory-service} ejecuta pruebas unitarias y de
+ * integración. Sin Docker, {@code mvn verify -pl inventory-service} falla con un mensaje explícito;
+ * para el ciclo rápido usa {@code mvn test -pl inventory-service}, que ejecuta solo unitarias y
+ * deja los ITs sin verificar.
+ */
 @Testcontainers
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 class InventoryReservationIT {

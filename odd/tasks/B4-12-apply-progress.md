@@ -10,7 +10,7 @@ Origen: WARN **W3** de la verificación `03-verify-odd` de B4-08 (2026-11-24 11:
 - [x] A — Workflow de CI: `mvn test` → `mvn verify` para `inventory-service` (failsafe incluido)
 - [x] B — Quitar `disabledWithoutDocker = true` + chequeo explícito que **falla** con mensaje accionable
 - [ ] C — Test de conflicto `ON CONFLICT DO NOTHING` (coordinado con B4-11, task H)
-- [ ] D — Documentar la ruta local con y sin Docker
+- [x] D — Documentar la ruta local con y sin Docker
 - [ ] E — Verificación: `verify` con Docker, `test` sin Docker, `spotless:check`
 
 ## Definition of Done
@@ -20,7 +20,7 @@ Origen: WARN **W3** de la verificación `03-verify-odd` de B4-08 (2026-11-24 11:
 - [x] Sin Postgres disponible, la ejecución **falla** con mensaje explícito (nada de `skipped` silencioso)
 - [x] El mensaje dice qué se necesita y cuál es el comando alternativo (`mvn test`) para el ciclo rápido
 - [ ] El IT de conflicto `ON CONFLICT` (B4-11) está escrito y corre en CI
-- [ ] La ruta local con/sin Docker está documentada
+- [x] La ruta local con/sin Docker está documentada
 - [ ] `mvn -pl inventory-service verify` pasa en un entorno con Docker
 - [ ] `mvn -pl inventory-service test` sigue pasando sin Docker (ciclo rápido)
 - [ ] `mvn -pl inventory-service spotless:check` pasa
