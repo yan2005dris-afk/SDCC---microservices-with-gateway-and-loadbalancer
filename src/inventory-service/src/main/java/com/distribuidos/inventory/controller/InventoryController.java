@@ -38,6 +38,8 @@ public class InventoryController {
   public ResponseEntity<?> reserveStock(@Valid @RequestBody ReserveStockRequest request) {
     return ResponseEntity.ok()
         .header("X-Instance-Id", instanceId)
-        .body(reservationService.reserveStock(request.productCode(), request.quantity()));
+        .body(
+            reservationService.reserveStock(
+                request.productCode(), request.quantity(), request.orderNumber()));
   }
 }
