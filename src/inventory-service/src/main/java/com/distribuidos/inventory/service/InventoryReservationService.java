@@ -135,6 +135,8 @@ public class InventoryReservationService {
   }
 
   private ReservationResponse reservationResponse(String productCode) {
+    // This read must remain inside the @Transactional method that owns the row lock.
+    // remainingStock means "stock after my reservation", not stock at response time.
     InventoryProduct product =
         repository
             .findByProductCode(productCode)
