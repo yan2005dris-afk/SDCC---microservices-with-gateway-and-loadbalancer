@@ -15,6 +15,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -32,6 +34,15 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class InventoryReservationService {
 
+  /** Log estructurado de negocio: una línea por resultado de reserva. */
+  private static final Logger log = LoggerFactory.getLogger(InventoryReservationService.class);
+
+  /** Resultado de negocio de una reserva que sí descontó stock. */
+  private static final String RESULT_OK = "OK";
+
+  /** Resultado de negocio de una reserva rechazada por stock insuficiente. */
+  private static final String RESULT_INSUFFICIENT = "INSUFFICIENT";
+
   private final InventoryProductRepository repository;
   private final StockMovementRepository stockMovementRepository;
 
@@ -48,7 +59,9 @@ public class InventoryReservationService {
     if (idempotent) {
       lockProduct(productCode);
       if (findReservation(orderNumber, productCode).isPresent()) {
-        return reservationResponse(productCode);
+        ReservationResponse replay = reservationResponse(productCode);
+        logReserve(productCode, quantity, orderNumber, RESULT_OK, replay.remainingStock());
+        return replay;
       }
     }
 
@@ -58,7 +71,9 @@ public class InventoryReservationService {
       findReservation(orderNumber, productCode)
           .orElseThrow(
               () -> new IllegalStateException("Conflicting reservation movement not found"));
-      return reservationResponse(productCode);
+      ReservationResponse winner = reservationResponse(productCode);
+      logReserve(productCode, quantity, orderNumber, RESULT_OK, winner.remainingStock());
+      return winner;
     }
 
     int updated = repository.reserveAtomically(productCode, quantity);
@@ -67,10 +82,13 @@ public class InventoryReservationService {
           repository
               .findByProductCode(productCode)
               .orElseThrow(() -> new ProductNotFoundException(productCode));
+      logReserve(productCode, quantity, orderNumber, RESULT_INSUFFICIENT, product.getStock());
       throw new StockUnavailableException(productCode, product.getStock());
     }
 
-    return reservationResponse(productCode);
+    ReservationResponse response = reservationResponse(productCode);
+    logReserve(productCode, quantity, orderNumber, RESULT_OK, response.remainingStock());
+    return response;
   }
 
   /** Releases a previously reserved stock quantity; repeated calls return the same response. */
@@ -110,6 +128,30 @@ public class InventoryReservationService {
 
   private boolean hasOrderNumber(String orderNumber) {
     return orderNumber != null && !orderNumber.isBlank();
+  }
+
+  /**
+   * Escribe la línea de negocio de la reserva.
+   *
+   * <p>Formato: {@code stock.reserve code=… qty=… order=… result=OK|INSUFFICIENT remaining=…}. No
+   * incluye traza ni datos sensibles: solo código de producto, cantidad, orden, resultado y stock
+   * disponible.
+   *
+   * @param productCode código del producto.
+   * @param quantity unidades reservadas.
+   * @param orderNumber número de orden (puede ser {@code null} si la reserva no es idempotente).
+   * @param result resultado de negocio de la reserva.
+   * @param remaining stock disponible tras la reserva (o disponible en el rechazo).
+   */
+  private void logReserve(
+      String productCode, int quantity, String orderNumber, String result, Integer remaining) {
+    log.info(
+        "stock.reserve code={} qty={} order={} result={} remaining={}",
+        productCode,
+        quantity,
+        orderNumber,
+        result,
+        remaining);
   }
 
   private void lockProduct(String productCode) {

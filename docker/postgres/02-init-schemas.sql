@@ -68,6 +68,10 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_stock_movement_order_product_type
 ON stock_movement_history(reference_order_number, movement_type, product_code)
 WHERE reference_order_number IS NOT NULL;
 
+-- Consulta de movimientos por producto (historial y auditoría de stock).
+CREATE INDEX IF NOT EXISTS idx_stock_movement_product_code
+ON stock_movement_history(product_code);
+
 -- Seed data inicial para inventario
 INSERT INTO inventory_products (product_code, name, description, stock, reserved_stock, unit_price, version)
 VALUES 

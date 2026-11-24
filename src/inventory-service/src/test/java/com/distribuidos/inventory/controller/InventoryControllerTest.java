@@ -19,6 +19,7 @@ import com.distribuidos.inventory.dto.ReservationResponse;
 import com.distribuidos.inventory.exception.ProductNotFoundException;
 import com.distribuidos.inventory.exception.ReservationNotFoundException;
 import com.distribuidos.inventory.exception.StockUnavailableException;
+import com.distribuidos.inventory.observability.InstanceIdentity;
 import com.distribuidos.inventory.repository.InventoryProductRepository;
 import com.distribuidos.inventory.service.InventoryReservationService;
 import com.distribuidos.inventory.web.ApiExceptionHandler;
@@ -29,12 +30,15 @@ import org.junit.jupiter.api.Test;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.ResultActions;
 
 @WebMvcTest(InventoryController.class)
+@Import(InstanceIdentity.class)
 class InventoryControllerTest {
 
   private static final String RESERVE_URL = "/api/inventory/reserve";
@@ -304,6 +308,42 @@ class InventoryControllerTest {
       logger.detachAppender(appender);
       appender.stop();
     }
+  }
+
+  @Test
+  void everyResponseCarriesInstanceAndCorrelationHeaders() throws Exception {
+    when(repository.findByProductCode("PROD-001")).thenReturn(Optional.empty());
+
+    MvcResult result =
+        mockMvc
+            .perform(get("/api/inventory/PROD-001"))
+            .andExpect(status().isNotFound())
+            .andReturn();
+
+    assertThat(result.getResponse().getHeader("X-Instance-Id")).startsWith("inventory-service");
+    assertThat(result.getResponse().getHeader("X-Correlation-Id")).isNotBlank();
+  }
+
+  @Test
+  void incomingCorrelationIdIsPropagatedToTheResponse() throws Exception {
+    when(repository.findByProductCode("PROD-001")).thenReturn(Optional.empty());
+
+    MvcResult result =
+        mockMvc
+            .perform(get("/api/inventory/PROD-001").header("X-Correlation-Id", "trace-abc"))
+            .andExpect(status().isNotFound())
+            .andReturn();
+
+    assertThat(result.getResponse().getHeader("X-Correlation-Id")).isEqualTo("trace-abc");
+  }
+
+  @Test
+  void unmappedPathAlsoCarriesInstanceAndCorrelationHeaders() throws Exception {
+    MvcResult result =
+        mockMvc.perform(get("/api/inventory/a/b")).andExpect(status().isNotFound()).andReturn();
+
+    assertThat(result.getResponse().getHeader("X-Instance-Id")).startsWith("inventory-service");
+    assertThat(result.getResponse().getHeader("X-Correlation-Id")).isNotBlank();
   }
 
   private void expectBadRequestProblem(ResultActions result, String detail) throws Exception {

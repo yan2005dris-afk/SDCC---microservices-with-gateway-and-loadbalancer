@@ -19,7 +19,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.client.TestRestTemplate;
 import org.springframework.boot.test.web.server.LocalServerPort;
+import org.springframework.core.env.Environment;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -87,6 +89,8 @@ class InventoryReservationIT {
   @Autowired private StockMovementRepository stockMovementRepository;
 
   @Autowired private PlatformTransactionManager transactionManager;
+
+  @Autowired private Environment environment;
 
   @BeforeEach
   void resetStock() {
@@ -290,6 +294,73 @@ class InventoryReservationIT {
 
     assertStock("PROD-A", 0, 20);
     assertThat(movementsOfType("RESERVATION", "PROD-A")).isEqualTo(20);
+  }
+
+  @Test
+  void twentyConcurrentReservesWithScarceStockYieldFiveSuccessesAndFifteenRejections()
+      throws Exception {
+    jdbc.update("UPDATE inventory_products SET stock = 5 WHERE product_code = 'PROD-A'");
+
+    ExecutorService pool = Executors.newFixedThreadPool(20);
+    CountDownLatch start = new CountDownLatch(1);
+    List<Future<ResponseEntity<String>>> futures = new ArrayList<>();
+    try {
+      for (int i = 0; i < 20; i++) {
+        String orderNumber = String.format("ORD-SCARCE-%02d", i);
+        futures.add(
+            pool.submit(
+                () -> {
+                  start.await();
+                  return reserve(orderNumber, "PROD-A", 1);
+                }));
+      }
+      start.countDown();
+
+      List<HttpStatusCode> statuses = new ArrayList<>();
+      for (Future<ResponseEntity<String>> future : futures) {
+        statuses.add(future.get(30, TimeUnit.SECONDS).getStatusCode());
+      }
+
+      assertThat(statuses).filteredOn(status -> status == HttpStatus.OK).hasSize(5);
+      assertThat(statuses).filteredOn(status -> status == HttpStatus.BAD_REQUEST).hasSize(15);
+      assertThat(statuses).hasSize(20);
+    } finally {
+      pool.shutdownNow();
+      assertThat(pool.awaitTermination(10, TimeUnit.SECONDS)).isTrue();
+    }
+
+    assertStock("PROD-A", 0, 5);
+    // Los 15 rechazos no dejan movimiento: la transacción revierte al lanzar
+    // StockUnavailableException.
+    assertThat(movementsOfType("RESERVATION", "PROD-A")).isEqualTo(5);
+  }
+
+  @Test
+  void schemaHasIndexOnStockMovementProductCode() {
+    String indexDefinition =
+        jdbc.queryForObject(
+            "SELECT indexdef FROM pg_indexes WHERE indexname = 'idx_stock_movement_product_code'",
+            String.class);
+
+    assertThat(indexDefinition).isNotNull().contains("product_code").doesNotContain("UNIQUE");
+  }
+
+  @Test
+  void jpaOpenInViewIsDisabled() {
+    assertThat(environment.getProperty("spring.jpa.open-in-view")).isEqualTo("false");
+  }
+
+  @Test
+  void getProductSerializesEntityWithoutOpenSessionInView() {
+    ResponseEntity<String> response =
+        rest.getForEntity("http://localhost:" + port + "/api/inventory/PROD-A", String.class);
+
+    assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+    assertThat(response.getBody())
+        .contains("\"productCode\":\"PROD-A\"")
+        .contains("\"stock\":50")
+        .contains("\"reservedStock\":0");
+    assertThat(response.getHeaders().getFirst("X-Instance-Id")).isNotBlank();
   }
 
   private ResponseEntity<String> reserve(String orderNumber, String productCode, int quantity) {

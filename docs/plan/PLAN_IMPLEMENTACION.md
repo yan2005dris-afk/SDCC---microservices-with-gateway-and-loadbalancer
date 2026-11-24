@@ -60,7 +60,7 @@ Plan para resolver las tareas de [TAREAS_PENDIENTES.md](TAREAS_PENDIENTES.md). C
 | B1 | `fix/postgres-replica-bootstrap` | Infraestructura + Gateway | INF-01, INF-02, INF-03, GW-01 | — | 🔴 Primera |
 | B2 | `refactor/order-read-routing` | order-service | ORD-01, ORD-03, ORD-04, ORD-08 | B1 | 🔴 |
 | B3 | `feature/order-replica-readiness` | order-service | ORD-02, ORD-05, cabecera `X-Replication-Lag-Ms` | B2 | 🔴 |
-| B4 | `feature/inventory-reserve-hardening` | inventory-service | INV-01 a INV-06 | B1 | 🟠 |
+| B4 | `feature/inventory-reserve-hardening` ✅ | inventory-service | INV-01 a INV-06 | B1 | 🟠 |
 | B5 | `feature/order-inventory-pricing` | order-service | ORD-06, ORD-07 | B2, B4 | 🟡 |
 | B6 | `feature/inventory-catalog` *(opcional)* | inventory-service | INV-07 | B4 | 🟡 |
 | B7 | `test/experiment-scripts` | Scripts / colecciones | DOC-08, DOC-09 | B1 | 🟠 |
@@ -432,7 +432,7 @@ repository/StockMovementRepository
 model/StockMovement, model/MovementType  (RESERVATION, RELEASE, RESTOCK)
 dto/ReserveStockRequest, dto/ReservationResponse, dto/ReleaseStockRequest
 web/ApiExceptionHandler                  ← @RestControllerAdvice → ProblemDetail
-config/CorrelationIdFilter, config/InstanceIdHeaderFilter
+observability/CorrelationIdFilter, observability/InstanceIdentity, observability/MdcKeys
 ```
 
 - **Reserva atómica (INV-03).** En lugar de leer, modificar y guardar con `@Version`, que da conflicto en concurrencia, se usa una sola sentencia condicional:
@@ -449,7 +449,7 @@ config/CorrelationIdFilter, config/InstanceIdHeaderFilter
   int reserveAtomically(String code, int qty);
   ```
   Si devuelve `0` filas, el stock es insuficiente o el producto no existe; una lectura posterior distingue los dos casos. No hay reintentos ni condiciones de carrera, y el `CHECK (stock >= 0)` de la tabla actúa como segunda defensa.
-- **Idempotencia.** `ReserveStockRequest` incluye `orderNumber`. Se agrega un índice único `(reference_order_number, movement_type)` en `stock_movement_history`. Si la reserva ya existe, se devuelve el resultado anterior sin descontar otra vez. Así un reintento de `order-service` no descuenta el stock dos veces.
+- **Idempotencia.** `ReserveStockRequest` incluye `orderNumber`. Se agrega un índice único parcial `(reference_order_number, movement_type, product_code)` en `stock_movement_history` (`uq_stock_movement_order_product_type`). Si la reserva ya existe, se devuelve el resultado anterior sin descontar otra vez. Así un reintento de `order-service` no descuenta el stock dos veces.
 - **Movimientos (INV-06):** cada reserva o liberación inserta un `StockMovement` en **la misma transacción** que el `UPDATE`.
 - **Liberación (INV-06):** `POST /api/inventory/release {orderNumber}`. Busca el movimiento `RESERVATION`; si todavía no existe un `RELEASE`, devuelve el stock. Es idempotente.
 - **Contrato (INV-04, INV-05).** Es compatible hacia atrás con el cliente actual de `order-service`:
@@ -460,31 +460,31 @@ config/CorrelationIdFilter, config/InstanceIdHeaderFilter
 - **`orderNumber` opcional al principio:** en esta rama `orderNumber` es opcional para no romper el `order-service` actual. B5 lo empieza a enviar; después puede pasar a obligatorio.
 
 ### Checklist
-- [ ] DTO `ReserveStockRequest` (`@NotBlank productCode`, `@NotNull @Positive quantity`, `orderNumber`) + `spring-boot-starter-validation` (INV-02).
-- [ ] `ReservationResponse` y `ReleaseStockRequest`.
-- [ ] Entidad `StockMovement` + `MovementType` + `StockMovementRepository`.
-- [ ] `docker/postgres/02-init-schemas.sql`: índice único `uq_stock_movement_ref_type` e índice `idx_stock_movement_product_code`.
-- [ ] `InventoryProductRepository`: `reserveAtomically` y `releaseAtomically`.
-- [ ] `InventoryReservationService` con `@Transactional` y la lógica de idempotencia.
-- [ ] `InventoryController` delgado: `@Valid`, delega en el servicio. Elimina `Map<String, Object>` y los casts.
-- [ ] `POST /api/inventory/release`.
-- [ ] `ApiExceptionHandler` con `ProblemDetail` para validación, 404 y errores inesperados.
-- [ ] `InstanceIdHeaderFilter` y `CorrelationIdFilter` (MDC) con el mismo patrón de log que `order-service`.
-- [ ] Log `stock.reserve code=... qty=... order=... result=OK|INSUFFICIENT remaining=...`.
-- [ ] `application.yml`: `spring.jpa.open-in-view: false`.
+- [x] DTO `ReserveStockRequest` (`@NotBlank productCode`, `@NotNull @Positive quantity`, `orderNumber`) + `spring-boot-starter-validation` (INV-02).
+- [x] `ReservationResponse` y `ReleaseStockRequest`.
+- [x] Entidad `StockMovement` + `MovementType` + `StockMovementRepository`.
+- [x] `docker/postgres/02-init-schemas.sql`: índice único `uq_stock_movement_order_product_type` (parcial, sobre `(reference_order_number, movement_type, product_code)`) e índice `idx_stock_movement_product_code`.
+- [x] `InventoryProductRepository`: `reserveAtomically` y `releaseAtomically`.
+- [x] `InventoryReservationService` con `@Transactional` y la lógica de idempotencia.
+- [x] `InventoryController` delgado: `@Valid`, delega en el servicio. Elimina `Map<String, Object>` y los casts.
+- [x] `POST /api/inventory/release`.
+- [x] `ApiExceptionHandler` con `ProblemDetail` para validación, 404 y errores inesperados.
+- [x] `InstanceIdHeaderFilter` y `CorrelationIdFilter` (MDC) con el mismo patrón de log que `order-service`. *(Implementado como un único `CorrelationIdFilter` que pone `X-Instance-Id` y `X-Correlation-Id` en todas las respuestas: el plan pide un filtro, no una cabecera por método.)*
+- [x] Log `stock.reserve code=... qty=... order=... result=OK|INSUFFICIENT remaining=...`.
+- [x] `application.yml`: `spring.jpa.open-in-view: false`.
 
 ### Tests (INV-01)
-- [ ] `@WebMvcTest InventoryControllerTest`: 200, 400 por validación, 400 por stock insuficiente, 404, y `quantity` enviado como string → 400 en lugar de 500.
-- [ ] Unitario `InventoryReservationServiceTest`: idempotencia (dos reservas con el mismo `orderNumber` descuentan una sola vez) y liberación idempotente.
-- [ ] Integración `InventoryReservationIT` (`@DataJpaTest` o `@SpringBootTest` + Testcontainers):
+- [x] `@WebMvcTest InventoryControllerTest`: 200, 400 por validación, 400 por stock insuficiente, 404, y `quantity` enviado como string → 400 en lugar de 500.
+- [x] Unitario `InventoryReservationServiceTest`: idempotencia (dos reservas con el mismo `orderNumber` descuentan una sola vez) y liberación idempotente.
+- [x] Integración `InventoryReservationIT` (`@DataJpaTest` o `@SpringBootTest` + Testcontainers):
   - Producto con stock 5 y 20 hilos que reservan 1 unidad cada uno → exactamente 5 éxitos, stock final 0, 5 movimientos `RESERVATION`.
   - Reserva y luego liberación → el stock vuelve a su valor inicial.
-- [ ] `pom.xml`: Testcontainers + failsafe. `ci-inventory-service.yml`: `mvn verify`.
+- [x] `pom.xml`: Testcontainers + failsafe. `ci-inventory-service.yml`: `mvn verify`.
 
 ### Verificación manual
-- [ ] `POST /api/inventory/reserve` con `quantity: "2"` → 400 `ProblemDetail`.
-- [ ] Ejecutar P02 con creación de pedidos concurrentes → no aparece ningún 500 por conflicto de concurrencia.
-- [ ] `SELECT * FROM stock_movement_history;` en `inventory_db` muestra las reservas.
+- [x] `POST /api/inventory/reserve` con `quantity: "2"` → 400 `ProblemDetail`. *(cubierto por la suite: `InventoryControllerTest.rejectsNonNumericQuantityWithProblemDetail`)*
+- [ ] Ejecutar P02 con creación de pedidos concurrentes → no aparece ningún 500 por conflicto de concurrencia. *(pendiente: es una ejecución de P02, del bloque B7/B9)*
+- [x] `SELECT * FROM stock_movement_history;` en `inventory_db` muestra las reservas. *(cubierto por `InventoryReservationIT`, que escribe y verifica movimientos en PostgreSQL real)*
 
 ---
 
@@ -670,12 +670,14 @@ Marca cada tarea cuando esté **implementada y verificada en su rama**.
 - [x] Cabecera `X-Replication-Lag-Ms` — *B3*
 
 ### inventory-service
-- [ ] **INV-01** Tests unitarios + integración (concurrencia) — *B4*
-- [ ] **INV-02** DTO tipado y validado en `/reserve` — *B4*
-- [ ] **INV-03** Reserva atómica sin 500 en concurrencia — *B4*
-- [ ] **INV-04** Formato de error unificado (`ProblemDetail`) y 404 — *B4*
-- [ ] **INV-05** `/reserve` devuelve `unitPrice` y `productName` — *B4*
-- [ ] **INV-06** `stock_movement_history` + `POST /release` idempotente — *B4*
+> B4 implementado y verificado en la rama `feature/inventory-reserve-hardening` (ODDs `B4-01`…`B4-13` en `odd/archive/`; informe en `odd/verification/B4-verification-2026-11-24.md`).
+
+- [x] **INV-01** Tests unitarios + integración (concurrencia) — *B4*
+- [x] **INV-02** DTO tipado y validado en `/reserve` — *B4*
+- [x] **INV-03** Reserva atómica sin 500 en concurrencia — *B4*
+- [x] **INV-04** Formato de error unificado (`ProblemDetail`) y 404 — *B4*
+- [x] **INV-05** `/reserve` devuelve `unitPrice` y `productName` — *B4*
+- [x] **INV-06** `stock_movement_history` + `POST /release` idempotente — *B4*
 - [ ] **INV-07** Catálogo y reposición (o recorte del PRD) — *B6 / B8*
 
 ### Scripts y colecciones — B7 `test/experiment-scripts`
