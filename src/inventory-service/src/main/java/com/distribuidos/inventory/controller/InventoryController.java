@@ -1,6 +1,7 @@
 package com.distribuidos.inventory.controller;
 
 import com.distribuidos.inventory.dto.ReserveStockRequest;
+import com.distribuidos.inventory.exception.ProductNotFoundException;
 import com.distribuidos.inventory.repository.InventoryProductRepository;
 import com.distribuidos.inventory.service.InventoryReservationService;
 import jakarta.validation.Valid;
@@ -31,7 +32,7 @@ public class InventoryController {
     return repository
         .findByProductCode(productCode)
         .map(p -> ResponseEntity.ok().header("X-Instance-Id", instanceId).body(p))
-        .orElse(ResponseEntity.notFound().build());
+        .orElseThrow(() -> new ProductNotFoundException(productCode));
   }
 
   @PostMapping("/reserve")
