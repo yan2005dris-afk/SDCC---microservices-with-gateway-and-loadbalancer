@@ -130,7 +130,8 @@ Notas de método que conviene conservar:
   registrado porque es exactamente el tipo de "test verde que no prueba nada" que la batería de mutaciones
   sirve para destapar.
 - El ítem "`mvn verify` pasa **en CI**" se verificó en su equivalente local (mismo comando, mismo JDK 21, Docker
-  disponible); la corrida remota la confirma el pipeline en el próximo push.
+  disponible); la corrida remota la confirma el pipeline en el próximo push. **→ Confirmado en remoto el
+  2026-11-24 14:31** (ver §9).
 
 ## 6. Calidad de commits
 
@@ -212,3 +213,27 @@ problema de compilación no demuestra cobertura.
   necesita su bean; es el mismo apaño de `OrderControllerTest`. Ninguna aserción previa se modificó.
 - **Verificación manual de P02** sigue pendiente (es una corrida de P02, de B7/B9): en el plan queda como el
   único checkbox de B4 sin marcar y **no** se marcó como hecho.
+
+## 9. Confirmación en CI remoto (cierra el último ítem pendiente de B4)
+
+Hasta el 2026-11-24 13:50, el único ítem que quedaba abierto del bloque era *"`mvn verify` pasa **en CI**"*:
+se había verificado en el equivalente local (mismo comando, mismo JDK 21, Docker disponible), pero sin corrida
+remota. Con el push de la rama (`d849148`) y la apertura del **PR #10** (`brydyan/feature/inventory-reserve-hardening`
+→ `develop`), la corrida remota existe y está **verde**:
+
+| Check | Workflow | Resultado |
+|---|---|---|
+| `Lint, Format & Test` | `CI - Inventory Service` (`ci-inventory-service.yml`) | ✅ **success** — `spotless:check` ✔, `checkstyle:check` ✔, `mvn -f src/pom.xml verify -pl inventory-service` ✔ |
+| `Replicación y enrutamiento end-to-end` | `CI - Order Service` | ✅ **success** |
+| `GitGuardian Security Checks` | GitGuardian | ✅ **success** — 97 commits escaneados, **0 secretos** detectados |
+
+El paso `mvn -f src/pom.xml verify -pl inventory-service` ejecuta la fase `verify`, que incluye **failsafe**:
+los 14 ITs de `InventoryReservationIT` corrieron contra un **PostgreSQL 15 real** en el runner de GitHub
+Actions (Docker disponible por defecto) y pasaron. **0 tests omitidos**: no hubo `skipped` silencioso.
+
+Estado del PR #10 al confirmarlo: `mergeable: true`, `mergeable_state: clean`, 97 commits, 66 archivos
+cambiados, sin conflictos con `develop`.
+
+Con esto, **el bloque B4 no tiene ningún ítem pendiente**: los 13 ítems del checklist de B4 están
+implementados y verificados, las 6 tareas de trazabilidad INV-01…INV-06 están cerradas, y la verificación
+es por ejecución tanto local como remota.

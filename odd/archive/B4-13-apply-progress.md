@@ -98,6 +98,9 @@ aserción (se verificó que ninguno murió por error de compilación):
   marcó como hecho.
 - **El ítem "pasa en CI"** (como en B4-12) se verificó en su equivalente local: mismo comando, mismo JDK 21,
   Docker disponible. La corrida remota se confirma en el pipeline del próximo push.
+  **→ Confirmado en remoto el 2026-11-24 14:31:** PR #10, workflow `CI - Inventory Service`, paso
+  `mvn -f src/pom.xml verify -pl inventory-service` en **success** (los 14 ITs con Postgres 15 real corrieron
+  en el runner, 0 omitidos). Ver `odd/verification/B4-verification-2026-11-24.md` §9.
 
 ## Commits
 

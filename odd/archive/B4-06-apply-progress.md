@@ -74,6 +74,9 @@ Un test que no detecta la mutación no fija nada. Los 5 ITs nuevos se sometieron
   el spec exige "stock final = 0", que solo es alcanzable con peticiones distinctes.
 - El ítem "`mvn verify` pasa **en CI**" se verificó en su equivalente local (mismo comando, mismo JDK 21,
   Docker disponible). La corrida remota queda confirmada por el pipeline en el próximo push.
+  **→ Confirmado en remoto el 2026-11-24 14:31:** PR #10, workflow `CI - Inventory Service`, paso
+  `mvn -f src/pom.xml verify -pl inventory-service` en **success** (los ITs con Postgres 15 real corrieron
+  en el runner, 0 omitidos). Ver `odd/verification/B4-verification-2026-11-24.md` §9.
 - B4-06 no bloquea a ninguna otra ODD: su infraestructura (contenedor, failsafe, CI) ya estaba en pie desde
   B4-12.
 

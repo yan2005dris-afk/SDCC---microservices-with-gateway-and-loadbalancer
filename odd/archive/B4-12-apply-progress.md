@@ -41,6 +41,10 @@ Origen: WARN **W3** de la verificación `03-verify-odd` de B4-08 (2026-11-24 11:
   mensaje accionable. El ciclo rápido de desarrollo es `mvn test -pl inventory-service`.
 - El IT de conflicto (task C) dependió de la implementación de B4-11 (método `ON CONFLICT`). B4-11 se aplicó
   primero; el test ejecuta con Postgres real y verifica 200 idempotente sin marcar la transacción *rollback-only*.
+- **Corrida remota confirmada el 2026-11-24 14:31:** PR #10 (`brydyan/feature/inventory-reserve-hardening` →
+  `develop`), workflow `CI - Inventory Service`, paso `mvn -f src/pom.xml verify -pl inventory-service` en
+  **success**. Los ITs corrieron contra Postgres 15 real en el runner de GitHub Actions, **0 omitidos**.
+  Ver `odd/verification/B4-verification-2026-11-24.md` §9.
 
 ## Commits
 
