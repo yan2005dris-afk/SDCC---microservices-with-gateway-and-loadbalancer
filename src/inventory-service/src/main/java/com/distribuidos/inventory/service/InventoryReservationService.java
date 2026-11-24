@@ -1,5 +1,6 @@
 package com.distribuidos.inventory.service;
 
+import com.distribuidos.inventory.dto.ReservationResponse;
 import com.distribuidos.inventory.exception.ProductNotFoundException;
 import com.distribuidos.inventory.exception.StockUnavailableException;
 import com.distribuidos.inventory.model.InventoryProduct;
@@ -17,9 +18,9 @@ public class InventoryReservationService {
     this.repository = repository;
   }
 
-  /** Atomically reserves {@code quantity} units and returns the remaining stock. */
+  /** Atomically reserves {@code quantity} units and returns the enriched reservation response. */
   @Transactional
-  public int reserveStock(String productCode, int quantity) {
+  public ReservationResponse reserveStock(String productCode, int quantity) {
     int updated = repository.reserveAtomically(productCode, quantity);
     if (updated == 0) {
       InventoryProduct product =
@@ -28,9 +29,16 @@ public class InventoryReservationService {
               .orElseThrow(() -> new ProductNotFoundException(productCode));
       throw new StockUnavailableException(productCode, product.getStock());
     }
-    return repository
-        .findByProductCode(productCode)
-        .orElseThrow(() -> new ProductNotFoundException(productCode))
-        .getStock();
+    InventoryProduct product =
+        repository
+            .findByProductCode(productCode)
+            .orElseThrow(() -> new ProductNotFoundException(productCode));
+    return new ReservationResponse(
+        productCode,
+        true,
+        product.getStock(),
+        product.getUnitPrice(),
+        product.getName(),
+        "Reserva confirmada");
   }
 }

@@ -7,10 +7,12 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.distribuidos.inventory.dto.ReservationResponse;
 import com.distribuidos.inventory.exception.ProductNotFoundException;
 import com.distribuidos.inventory.exception.StockUnavailableException;
 import com.distribuidos.inventory.repository.InventoryProductRepository;
 import com.distribuidos.inventory.service.InventoryReservationService;
+import java.math.BigDecimal;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -66,7 +68,15 @@ class InventoryControllerTest {
 
   @Test
   void validRequestDelegatesToService() throws Exception {
-    when(reservationService.reserveStock("PROD-001", 5)).thenReturn(5);
+    when(reservationService.reserveStock("PROD-001", 5))
+        .thenReturn(
+            new ReservationResponse(
+                "PROD-001",
+                true,
+                5,
+                new BigDecimal("1899.99"),
+                "Laptop Dell XPS 15",
+                "Reserva confirmada"));
 
     performReserve(
             "{\"productCode\":\"PROD-001\",\"quantity\":5,\"orderNumber\":\"ORD-20250101-001\"}")
