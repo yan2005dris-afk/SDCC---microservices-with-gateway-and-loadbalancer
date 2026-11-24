@@ -6,39 +6,43 @@ ODD: `odd/tasks/B4-09-inventory-dto-validation-coverage.md`
 
 ## Tasks
 
-- [ ] A — Test `quantity` ausente → 400 `"quantity es requerido"` (`<commit>`)
-- [ ] B — Test `quantity: null` → 400 `"quantity es requerido"` (`<commit>`)
-- [ ] C — Test `productCode` ausente → 400 `"productCode no puede estar vacío"` (`<commit>`)
-- [ ] D — Test sin `orderNumber` → 200, `reserveStock("PROD-001", 5, null)` (`<commit>`)
-- [ ] E — `verifyNoInteractions(reservationService)` en los 3 casos de validación rechazada (`<commit>`)
-- [ ] F — Trazabilidad de B4-01 verificada (ya aplicada en el commit de esta ODD) (`<commit>`)
-- [ ] G — `mvn -pl inventory-service verify` + `spotless:check` en verde (`<commit>`)
+- [x] A — Test `quantity` ausente → 400 `"quantity es requerido"` (`a969dbe`)
+- [x] B — Test `quantity: null` → 400 `"quantity es requerido"` (`a969dbe`)
+- [x] C — Test `productCode` ausente → 400 `"productCode no puede estar vacío"` (`a969dbe`)
+- [x] D — Test sin `orderNumber` → 200, `reserveStock("PROD-001", 5, null)` (`a969dbe`)
+- [x] E — `verifyNoInteractions(reservationService)` en los 3 casos de validación rechazada (`a969dbe`)
+- [x] F — Trazabilidad de B4-01 verificada (ya aplicada en `40dda40`)
+- [x] G — `mvn -pl inventory-service verify` + `spotless:check` en verde (`a969dbe`)
 
 ## Definition of Done
 
-- [ ] Test `quantity` ausente → 400 ProblemDetail `"quantity es requerido"`
-- [ ] Test `quantity: null` → 400 ProblemDetail `"quantity es requerido"`
-- [ ] Test `productCode` ausente → 400 ProblemDetail `"productCode no puede estar vacío"`
-- [ ] Test sin `orderNumber` → 200 y `reserveStock("PROD-001", 5, null)`
-- [ ] Los 13 tests actuales de `InventoryControllerTest` siguen verdes sin modificarlos
-- [ ] `verifyNoInteractions(reservationService)` en los 3 casos de validación rechazada
-- [ ] Trazabilidad de B4-01 correcta (`14 → 21`, DoD marcado)
-- [ ] `mvn -pl inventory-service verify` pasa
-- [ ] `mvn -pl inventory-service spotless:check` pasa
+- [x] Test `quantity` ausente → 400 ProblemDetail `"quantity es requerido"`
+- [x] Test `quantity: null` → 400 ProblemDetail `"quantity es requerido"`
+- [x] Test `productCode` ausente → 400 ProblemDetail `"productCode no puede estar vacío"`
+- [x] Test sin `orderNumber` → 200 y `reserveStock("PROD-001", 5, null)`
+- [x] Los 13 tests actuales de `InventoryControllerTest` siguen verdes sin modificarlos
+- [x] `verifyNoInteractions(reservationService)` en los 3 casos de validación rechazada
+- [x] Trazabilidad de B4-01 correcta (`14 → 21`, DoD marcado)
+- [x] `mvn -pl inventory-service verify` pasa
+- [x] `mvn -pl inventory-service spotless:check` pasa
 
 ## Tests
 
 | Alcance | Antes | Después |
 |---|---|---|
-| `inventory-service` | 22 | ? (0 failures, 0 errors) |
-| Reactor completo (JDK 21) | 92 | ? (0 failures, 0 errors) |
+| `inventory-service` | 22 | 26 (0 failures, 0 errors) |
+| Reactor completo (JDK 21) | 92 | 96 (0 failures, 0 errors) |
 
 ## Desviaciones / TODO / gaps
 
-_(pendiente)_
+- Las tareas A–E se entregan en un solo commit (`a969dbe`) porque las cinco afectan al mismo archivo de test y forman una sola unidad de cobertura.
+- No se tocó `ApiExceptionHandler.java`: pertenece a B4-07. Tampoco se modificaron los 13 tests existentes de `InventoryControllerTest`.
+- La tarea F ya estaba aplicada en el repositorio (`40dda40`): `B4-01-apply-progress.md` registra `14 → 21` y el DoD de la spec archivada está marcado. Solo se verificó.
+- JDK 25 sigue roto para Spotless 2.44.3 y mocks de Mockito; toda la verificación se ejecutó con `JAVA_HOME=/usr/lib/jvm/java-21-openjdk`.
+- Sin gaps nuevos. Quedan fuera de alcance los huecos propios de B4-06 y B4-08.
 
 ## Commits
 
 ```
-(pendiente)
+a969dbe test(inventory): cover DTO validation gaps
 ```
