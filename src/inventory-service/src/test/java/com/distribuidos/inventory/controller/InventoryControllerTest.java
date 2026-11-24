@@ -1,6 +1,7 @@
 package com.distribuidos.inventory.controller;
 
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -67,6 +68,46 @@ class InventoryControllerTest {
     expectBadRequestProblem(
         performReserve("{\"productCode\":\"\",\"quantity\":5}"),
         "productCode no puede estar vacío");
+  }
+
+  @Test
+  void rejectsMissingQuantityWithProblemDetail() throws Exception {
+    expectBadRequestProblem(
+        performReserve("{\"productCode\":\"PROD-001\"}"), "quantity es requerido");
+    verifyNoInteractions(reservationService);
+  }
+
+  @Test
+  void rejectsExplicitNullQuantityWithProblemDetail() throws Exception {
+    expectBadRequestProblem(
+        performReserve("{\"productCode\":\"PROD-001\",\"quantity\":null}"),
+        "quantity es requerido");
+    verifyNoInteractions(reservationService);
+  }
+
+  @Test
+  void rejectsMissingProductCodeWithProblemDetail() throws Exception {
+    expectBadRequestProblem(performReserve("{\"quantity\":5}"), "productCode no puede estar vacío");
+    verifyNoInteractions(reservationService);
+  }
+
+  @Test
+  void requestWithoutOrderNumberDelegatesWithNullOrderNumber() throws Exception {
+    when(reservationService.reserveStock("PROD-001", 5, null))
+        .thenReturn(
+            new ReservationResponse(
+                "PROD-001",
+                true,
+                5,
+                new BigDecimal("1899.99"),
+                "Laptop Dell XPS 15",
+                "Reserva confirmada"));
+
+    performReserve("{\"productCode\":\"PROD-001\",\"quantity\":5}")
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.productCode").value("PROD-001"));
+
+    verify(reservationService).reserveStock("PROD-001", 5, null);
   }
 
   @Test
