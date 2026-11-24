@@ -7,7 +7,7 @@
 **Responsable:** Andy
 
 > Rework de B4-08 (verificación = WARN). No reemplaza a B4-08: la cierra.
-> B4-08 sigue en `odd/tasks/` (no se archivó) hasta que esta ODD cierre y sus criterios de aceptación pasen.
+> B4-08 se archivó en `odd/archive/` el 2026-11-24 12:45, tras la re-verificación que dio PASS a ambos.
 
 ---
 

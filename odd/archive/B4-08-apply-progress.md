@@ -270,5 +270,5 @@ no hay entidad, dominio ni contrato de API nuevo).
 Verificación global de esta sesión: `mvn -pl inventory-service verify` → 41 unit/slice + 5 ITs, BUILD SUCCESS;
 reactor 111 tests (gateway 7 · order 63 · inventory 41) en verde; `spotless:check` en verde.
 
-**B4-08 sigue en `odd/tasks/`** — su cierre (PASS limpio → `odd/archive/`) requiere la re-verificación
-`/03-verify-odd`; no se archiva por declaración propia.
+> **Actualización 2026-11-24 12:45:** la re-verificación `03-verify-odd` de bloque dio **PASS** y B4-08 fue
+> archivado en `odd/archive/` con su evidencia (ver `odd/verification/B4-verification-2026-11-24.md`).

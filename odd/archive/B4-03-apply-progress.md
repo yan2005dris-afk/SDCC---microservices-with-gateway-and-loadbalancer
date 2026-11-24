@@ -167,5 +167,5 @@ El rework `odd/archive/B4-07-inventory-error-handling-fix.md` está **implementa
 Verificación: `mvn -pl inventory-service verify` → 41 unit/slice + 5 ITs con Postgres real, 0 skipped;
 reactor 111 tests en verde; `spotless:check` en verde. Batería de mutación: revertir el handler mata 5 tests.
 
-**B4-03 sigue en `odd/tasks/`** — su cierre (PASS limpio → `odd/archive/`) requiere la re-verificación
-`/03-verify-odd`; no se archiva por declaración propia.
+> **Actualización 2026-11-24 12:45:** la re-verificación `03-verify-odd` de bloque dio **PASS** y B4-03 fue
+> archivado en `odd/archive/` con su evidencia (ver `odd/verification/B4-verification-2026-11-24.md`).

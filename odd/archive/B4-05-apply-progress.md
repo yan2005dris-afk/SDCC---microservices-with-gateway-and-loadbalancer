@@ -155,5 +155,5 @@ Los tres huecos que dejaron B4-05 abierto están **cerrados y verificados con Po
 
 Además: `mvn -pl inventory-service verify` → BUILD SUCCESS; reactor 111 tests en verde; `spotless:check` en verde.
 
-**B4-05 sigue en `odd/tasks/`** — su cierre (PASS limpio → `odd/archive/`) requiere la re-verificación
-`/03-verify-odd`; no se archiva por declaración propia.
+> **Actualización 2026-11-24 12:45:** la re-verificación `03-verify-odd` de bloque dio **PASS** y B4-05 fue
+> archivado en `odd/archive/` con su evidencia (ver `odd/verification/B4-verification-2026-11-24.md`).

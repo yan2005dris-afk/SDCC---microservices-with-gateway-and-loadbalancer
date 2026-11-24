@@ -20,6 +20,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.client.TestRestTemplate;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.DynamicPropertyRegistry;
@@ -202,6 +203,95 @@ class InventoryReservationIT {
     assertThat(indexDefinition).contains("product_code");
   }
 
+  @Test
+  void releaseIsIdempotentAndDoesNotRestoreStockTwice() {
+    assertThat(reserve("ORD-REL-IDEM", "PROD-A", 5).getStatusCode()).isEqualTo(HttpStatus.OK);
+    assertStock("PROD-A", 45, 5);
+
+    ResponseEntity<String> firstRelease =
+        post("/api/inventory/release", Map.of("orderNumber", "ORD-REL-IDEM"));
+    assertThat(firstRelease.getStatusCode()).isEqualTo(HttpStatus.OK);
+    assertStock("PROD-A", 50, 0);
+    assertThat(movements("ORD-REL-IDEM", "RELEASE", "PROD-A")).isEqualTo(1);
+
+    ResponseEntity<String> repeatedRelease =
+        post("/api/inventory/release", Map.of("orderNumber", "ORD-REL-IDEM"));
+    assertThat(repeatedRelease.getStatusCode()).isEqualTo(HttpStatus.OK);
+    assertThat(repeatedRelease.getBody()).contains("\"message\":\"Stock liberado exitosamente\"");
+    assertStock("PROD-A", 50, 0);
+    assertThat(movements("ORD-REL-IDEM", "RELEASE", "PROD-A")).isEqualTo(1);
+  }
+
+  @Test
+  void fullReserveReleaseFlowLeavesReservationAndReleaseMovements() {
+    assertThat(reserve("ORD-FLOW", "PROD-A", 5).getStatusCode()).isEqualTo(HttpStatus.OK);
+    assertStock("PROD-A", 45, 5);
+    assertThat(movements("ORD-FLOW", "RESERVATION", "PROD-A")).isEqualTo(1);
+
+    ResponseEntity<String> release =
+        post("/api/inventory/release", Map.of("orderNumber", "ORD-FLOW"));
+    assertThat(release.getStatusCode()).isEqualTo(HttpStatus.OK);
+    assertStock("PROD-A", 50, 0);
+    assertThat(movements("ORD-FLOW", "RESERVATION", "PROD-A")).isEqualTo(1);
+    assertThat(movements("ORD-FLOW", "RELEASE", "PROD-A")).isEqualTo(1);
+  }
+
+  @Test
+  void reserveUnknownProductReturns404ProblemDetail() {
+    ResponseEntity<String> response = reserve("ORD-MISSING", "PROD-999", 1);
+
+    assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+    assertThat(response.getHeaders().getContentType())
+        .isEqualTo(MediaType.APPLICATION_PROBLEM_JSON);
+    assertThat(response.getBody()).contains("Producto no encontrado: PROD-999");
+    assertThat(movements("ORD-MISSING", "RESERVATION", "PROD-999")).isZero();
+  }
+
+  @Test
+  void reserveWithoutEnoughStockReturns400WithRemainingStockAndNoMovement() {
+    jdbc.update("UPDATE inventory_products SET stock = 2 WHERE product_code = 'PROD-B'");
+
+    ResponseEntity<String> response = reserve("ORD-LOW", "PROD-B", 5);
+
+    assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    assertThat(response.getBody()).contains("\"available\":false");
+    assertThat(response.getBody()).contains("\"remainingStock\":2");
+    assertThat(response.getBody()).contains("Stock insuficiente. Disponible: 2");
+    assertStock("PROD-B", 2, 0);
+    assertThat(movements("ORD-LOW", "RESERVATION", "PROD-B")).isZero();
+  }
+
+  @Test
+  void twentyConcurrentReservesOfDistinctOrdersDrainStockToZero() throws Exception {
+    jdbc.update("UPDATE inventory_products SET stock = 20 WHERE product_code = 'PROD-A'");
+
+    ExecutorService pool = Executors.newFixedThreadPool(20);
+    CountDownLatch start = new CountDownLatch(1);
+    List<Future<ResponseEntity<String>>> futures = new ArrayList<>();
+    try {
+      for (int i = 0; i < 20; i++) {
+        String orderNumber = String.format("ORD-DRAIN-%02d", i);
+        futures.add(
+            pool.submit(
+                () -> {
+                  start.await();
+                  return reserve(orderNumber, "PROD-A", 1);
+                }));
+      }
+      start.countDown();
+
+      for (Future<ResponseEntity<String>> future : futures) {
+        assertThat(future.get(30, TimeUnit.SECONDS).getStatusCode()).isEqualTo(HttpStatus.OK);
+      }
+    } finally {
+      pool.shutdownNow();
+      assertThat(pool.awaitTermination(10, TimeUnit.SECONDS)).isTrue();
+    }
+
+    assertStock("PROD-A", 0, 20);
+    assertThat(movementsOfType("RESERVATION", "PROD-A")).isEqualTo(20);
+  }
+
   private ResponseEntity<String> reserve(String orderNumber, String productCode, int quantity) {
     return post(
         "/api/inventory/reserve",
@@ -234,6 +324,17 @@ class InventoryReservationIT {
                 + "WHERE reference_order_number = ? AND movement_type = ? AND product_code = ?",
             Integer.class,
             orderNumber,
+            movementType,
+            productCode);
+    return count == null ? 0 : count;
+  }
+
+  private int movementsOfType(String movementType, String productCode) {
+    Integer count =
+        jdbc.queryForObject(
+            "SELECT count(*) FROM stock_movement_history "
+                + "WHERE movement_type = ? AND product_code = ?",
+            Integer.class,
             movementType,
             productCode);
     return count == null ? 0 : count;
