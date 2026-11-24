@@ -44,6 +44,13 @@ Detalle:
 - `ProblemDetail` y HTTP 404/400 para las excepciones de dominio: pendiente de B4-03. Hasta entonces, una reserva fallida termina en 500 porque no existe `@RestControllerAdvice`.
 - La firma `int reserveStock(...)` es provisional; B4-04 la cambia por `ReservationResponse`.
 - El test de concurrencia usa un repositorio simulado con CAS atómico (`AtomicInteger`). No ejecuta PostgreSQL ni valida el parseo de la JPQL. El test de integración real con Testcontainers, el índice de idempotencia y la verificación en CI corresponden a B4-06 (task A/B/D/E). No se agregaron dependencias H2/Testcontainers aquí.
+- **Gaps detectados en la verificación `03-verify-odd` (2026-11-24), trackeados en B4-10:**
+  1. `@Modifying` sin `clearAutomatically`/`flushAutomatically` → la entidad en la caché de primer nivel queda
+     stale tras el UPDATE masivo (probado: `dbStock=45` pero `entityAfter=50`, `sameInstance=true`).
+  2. El `remainingStock` se lee con un 2º `SELECT`: solo es atómico porque ocurre dentro de la transacción que
+     mantiene el lock de fila (probado: el 2º UPDATE concurrente esperó 444 ms al lock). Invariante no
+     documentado en el código.
+  3. La suite es solo-mock: el JPQL del UPDATE masivo nunca lo ejecuta una BD real dentro de CI.
 - JDK 25 rompe Spotless 2.44.3 y los mocks de Mockito. Verificación ejecutada con `JAVA_HOME=/usr/lib/jvm/java-21-openjdk`. Fallo preexistente del entorno.
 
 ## Commits
