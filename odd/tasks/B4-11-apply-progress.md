@@ -9,7 +9,7 @@ Decisión del humano (2026-11-24): **opción A** — el 200 idempotente debe ser
 
 ## Tasks
 
-- [ ] A — Test de slice JPA: `releaseAtomically` con `reserved_stock` insuficiente → 0 filas, fila intacta
+- [x] A — Test de slice JPA: `releaseAtomically` con `reserved_stock` insuficiente → 0 filas, fila intacta
 - [ ] B — Test que fija la serialización por lock de fila (2 reservas concurrentes del mismo `(order, product)` → 1 movimiento)
 - [ ] C — Método de inserción con `ON CONFLICT (reference_order_number, movement_type, product_code) WHERE reference_order_number IS NOT NULL DO NOTHING` (opción A)
 - [ ] C2 — **Reordenar** `reserveStock` / `releaseStock`: insertar el movimiento **antes** del UPDATE de stock, y en caso de conflicto re-leer el ganador y responder 200 **sin tocar el stock**
@@ -20,7 +20,7 @@ Decisión del humano (2026-11-24): **opción A** — el 200 idempotente debe ser
 
 ## Definition of Done
 
-- [ ] Test de slice JPA: `releaseAtomically` con stock reservado insuficiente → 0 filas y fila intacta
+- [x] Test de slice JPA: `releaseAtomically` con stock reservado insuficiente → 0 filas y fila intacta
 - [ ] Ese test **falla** si se quita el guard `p.reservedStock >= :qty` (mutante M1 muere)
 - [ ] Test que fija la serialización por lock de fila (mutante M10 muere)
 - [ ] Opción A aplicada: insert con `ON CONFLICT DO NOTHING` (opción A, decidida por el humano)

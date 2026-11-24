@@ -54,6 +54,16 @@ class InventoryProductRepositoryJpaTest {
   }
 
   @Test
+  void releaseBelowReservedStockUpdatesNoRows() {
+    String code = "JPA-RELEASE-GUARD";
+    seed(code, 50);
+
+    assertThat(repository.releaseAtomically(code, 5)).isZero();
+    assertRow(code, 50, 0, 0);
+    assertThat(repository.findByProductCode(code).orElseThrow().getStock()).isEqualTo(50);
+  }
+
+  @Test
   @Transactional(propagation = Propagation.NOT_SUPPORTED)
   void twentyConcurrentReservesSerializeWithoutOptimisticLockErrors() throws Exception {
     String code = "JPA-CONCURRENT";
