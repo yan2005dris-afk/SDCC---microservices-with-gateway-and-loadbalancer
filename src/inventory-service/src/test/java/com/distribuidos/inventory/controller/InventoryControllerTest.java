@@ -81,8 +81,12 @@ class InventoryControllerTest {
     performReserve(
             "{\"productCode\":\"PROD-001\",\"quantity\":5,\"orderNumber\":\"ORD-20250101-001\"}")
         .andExpect(status().isOk())
+        .andExpect(jsonPath("$.productCode").value("PROD-001"))
         .andExpect(jsonPath("$.available").value(true))
-        .andExpect(jsonPath("$.remainingStock").value(5));
+        .andExpect(jsonPath("$.remainingStock").value(5))
+        .andExpect(jsonPath("$.unitPrice").value(1899.99))
+        .andExpect(jsonPath("$.productName").value("Laptop Dell XPS 15"))
+        .andExpect(jsonPath("$.message").value("Reserva confirmada"));
 
     verify(reservationService).reserveStock("PROD-001", 5);
   }
