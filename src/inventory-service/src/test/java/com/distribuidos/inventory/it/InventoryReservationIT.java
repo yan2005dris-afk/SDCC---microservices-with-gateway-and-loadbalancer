@@ -2,6 +2,8 @@ package com.distribuidos.inventory.it;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.distribuidos.inventory.model.MovementType;
+import com.distribuidos.inventory.repository.StockMovementRepository;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -10,6 +12,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -21,6 +24,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.testcontainers.DockerClientFactory;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
@@ -77,6 +82,10 @@ class InventoryReservationIT {
   @Autowired private TestRestTemplate rest;
 
   @Autowired private JdbcTemplate jdbc;
+
+  @Autowired private StockMovementRepository stockMovementRepository;
+
+  @Autowired private PlatformTransactionManager transactionManager;
 
   @BeforeEach
   void resetStock() {
@@ -148,6 +157,32 @@ class InventoryReservationIT {
     assertThat(response.getBody()).contains("No hay stock reservado suficiente");
     assertStock("PROD-A", 45, 2);
     assertThat(movements("ORD-REL", "RELEASE", "PROD-A")).isZero();
+  }
+
+  @Test
+  void duplicateConflictInsertReturnsZeroWithoutRollbackOnlyAndRepeatReserveStaysIdempotent() {
+    assertThat(reserve("ORD-CONFLICT", "PROD-A", 5).getStatusCode()).isEqualTo(HttpStatus.OK);
+    assertStock("PROD-A", 45, 5);
+
+    AtomicBoolean rollbackOnly = new AtomicBoolean();
+    Integer inserted =
+        new TransactionTemplate(transactionManager)
+            .execute(
+                status -> {
+                  int result =
+                      stockMovementRepository.insertIfAbsent(
+                          "PROD-A", MovementType.RESERVATION.name(), 5, "ORD-CONFLICT");
+                  rollbackOnly.set(status.isRollbackOnly());
+                  return result;
+                });
+
+    assertThat(inserted).isZero();
+    assertThat(rollbackOnly.get()).isFalse();
+
+    ResponseEntity<String> repeated = reserve("ORD-CONFLICT", "PROD-A", 5);
+    assertThat(repeated.getStatusCode()).isEqualTo(HttpStatus.OK);
+    assertStock("PROD-A", 45, 5);
+    assertThat(movements("ORD-CONFLICT", "RESERVATION", "PROD-A")).isEqualTo(1);
   }
 
   @Test

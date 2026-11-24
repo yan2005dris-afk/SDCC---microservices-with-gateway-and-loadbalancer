@@ -13,7 +13,7 @@ Decisión del humano (2026-11-24): **opción A** — el 200 idempotente debe ser
 - [x] B — Test que fija la serialización por lock de fila (2 reservas concurrentes del mismo `(order, product)` → 1 movimiento)
 - [x] C — Método de inserción con `ON CONFLICT (reference_order_number, movement_type, product_code) WHERE reference_order_number IS NOT NULL DO NOTHING` (opción A)
 - [x] C2 — **Reordenar** `reserveStock` / `releaseStock`: insertar el movimiento **antes** del UPDATE de stock, y en caso de conflicto re-leer el ganador y responder 200 **sin tocar el stock**
-- [ ] C3 — IT de Postgres del camino de conflicto (necesita **B4-12** para correr en CI)
+- [x] C3 — IT de Postgres del camino de conflicto (necesita **B4-12** para correr en CI)
 - [x] D — Documentar en el servicio la garantía real (lock de fila principal, índice único como red de seguridad)
 - [ ] E — Reflejar la decisión en el ODD de B4-08 y en `API_CONTRACT.md`
 - [ ] F — Verificación: `mvn -pl inventory-service verify` + `spotless:check` + batería de mutaciones
@@ -25,7 +25,7 @@ Decisión del humano (2026-11-24): **opción A** — el 200 idempotente debe ser
 - [x] Test que fija la serialización por lock de fila (mutante M10 muere)
 - [x] Opción A aplicada: insert con `ON CONFLICT DO NOTHING` (opción A, decidida por el humano)
 - [x] El movimiento se inserta **antes** del UPDATE de stock; en conflicto **no** se toca el stock
-- [ ] Conflicto → 200 con el movimiento ganador, sin excepción y sin transacción *rollback-only*
+- [x] Conflicto → 200 con el movimiento ganador, sin excepción y sin transacción *rollback-only*
 - [x] La cadena de garantías (lock → `ON CONFLICT` → índice único) está escrita en el servicio
 - [ ] El invariante de la idempotencia (lock + índice único) está escrito en el código y en el ODD de B4-08
 - [ ] `API_CONTRACT.md` refleja la respuesta actual de `/release`
@@ -44,8 +44,8 @@ Decisión del humano (2026-11-24): **opción A** — el 200 idempotente debe ser
 
 ## Desviaciones / TODO / gaps
 
-- Docker no disponible: los 4 ITs de `InventoryReservationIT` quedan omitidos. H-3 (ejecutarlos con Postgres real)
-  sigue abierto y **no** se cierra con esta ODD: es una tarea de entorno, no de código.
+- Docker/Postgres disponible: los ITs de `InventoryReservationIT`, incluido el nuevo test de conflicto, corren con
+  Postgres real. La omisión silenciosa quedó eliminada en B4-12.
 - El mutante M7 (`flushAutomatically` de `reserveAtomically`) sobrevive: es un gap menor, pero está listado en el
   DoD para que la batería de mutaciones quede completa.
 - La opción A de S2 usa `ON CONFLICT DO NOTHING`, que es SQL nativo de Postgres: su test **tiene** que vivir en el

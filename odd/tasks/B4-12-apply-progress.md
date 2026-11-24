@@ -9,7 +9,7 @@ Origen: WARN **W3** de la verificación `03-verify-odd` de B4-08 (2026-11-24 11:
 
 - [x] A — Workflow de CI: `mvn test` → `mvn verify` para `inventory-service` (failsafe incluido)
 - [x] B — Quitar `disabledWithoutDocker = true` + chequeo explícito que **falla** con mensaje accionable
-- [ ] C — Test de conflicto `ON CONFLICT DO NOTHING` (coordinado con B4-11, task H)
+- [x] C — Test de conflicto `ON CONFLICT DO NOTHING` (coordinado con B4-11, task H)
 - [x] D — Documentar la ruta local con y sin Docker
 - [x] E — Verificación: `verify` con Docker, `test` sin Docker, `spotless:check`
 
@@ -19,7 +19,7 @@ Origen: WARN **W3** de la verificación `03-verify-odd` de B4-08 (2026-11-24 11:
 - [x] El CI ejecuta y **exige** los ITs de `InventoryReservationIT`
 - [x] Sin Postgres disponible, la ejecución **falla** con mensaje explícito (nada de `skipped` silencioso)
 - [x] El mensaje dice qué se necesita y cuál es el comando alternativo (`mvn test`) para el ciclo rápido
-- [ ] El IT de conflicto `ON CONFLICT` (B4-11) está escrito y corre en CI
+- [x] El IT de conflicto `ON CONFLICT` (B4-11) está escrito y corre en CI
 - [x] La ruta local con/sin Docker está documentada
 - [x] `mvn -pl inventory-service verify` pasa en un entorno con Docker
 - [x] `mvn -pl inventory-service test` sigue pasando sin Docker (ciclo rápido)
@@ -29,9 +29,9 @@ Origen: WARN **W3** de la verificación `03-verify-odd` de B4-08 (2026-11-24 11:
 
 | Alcance | Antes | Después |
 |---|---:|---:|
-| `inventory-service` (unit) | 32 | 32 (0 failures, 0 errors, 0 skipped) |
-| `inventory-service` IT con Postgres | 4 skipped | **4 ejecutados** (0 failures, 0 errors, 0 skipped) |
-| Reactor completo (JDK 21) | 102 | 102 (0 failures, 0 errors, 0 skipped) |
+| `inventory-service` (unit) | 32 | 34 (0 failures, 0 errors, 0 skipped) |
+| `inventory-service` IT con Postgres | 4 skipped | **5 ejecutados** (0 failures, 0 errors, 0 skipped) |
+| Reactor completo (JDK 21) | 102 | 104 (0 failures, 0 errors, 0 skipped) |
 
 ## Desviaciones / TODO / gaps
 
@@ -39,8 +39,8 @@ Origen: WARN **W3** de la verificación `03-verify-odd` de B4-08 (2026-11-24 11:
   con 0 fallos, 0 errores y 0 omitidos. El bloqueo originalmente previsto en el apply-progress quedó resuelto.
 - Con la política de "fallar si no hay Postgres", `mvn verify -pl inventory-service` **falla** sin Docker con un
   mensaje accionable. El ciclo rápido de desarrollo es `mvn test -pl inventory-service`.
-- El IT de conflicto (task C) depende de la implementación de B4-11 (método `ON CONFLICT`). Mientras B4-11 no
-  aplique, el test se puede escribir pero fallaría por comportamiento → **aplicar B4-11 antes de la task C**.
+- El IT de conflicto (task C) dependió de la implementación de B4-11 (método `ON CONFLICT`). B4-11 se aplicó
+  primero; el test ejecuta con Postgres real y verifica 200 idempotente sin marcar la transacción *rollback-only*.
 
 ## Commits
 
