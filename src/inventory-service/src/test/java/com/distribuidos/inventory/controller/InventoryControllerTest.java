@@ -68,7 +68,7 @@ class InventoryControllerTest {
 
   @Test
   void validRequestDelegatesToService() throws Exception {
-    when(reservationService.reserveStock("PROD-001", 5))
+    when(reservationService.reserveStock("PROD-001", 5, "ORD-20250101-001"))
         .thenReturn(
             new ReservationResponse(
                 "PROD-001",
@@ -88,7 +88,7 @@ class InventoryControllerTest {
         .andExpect(jsonPath("$.productName").value("Laptop Dell XPS 15"))
         .andExpect(jsonPath("$.message").value("Reserva confirmada"));
 
-    verify(reservationService).reserveStock("PROD-001", 5);
+    verify(reservationService).reserveStock("PROD-001", 5, "ORD-20250101-001");
   }
 
   @Test
@@ -105,7 +105,7 @@ class InventoryControllerTest {
 
   @Test
   void reserveUnknownProductReturns404ProblemDetail() throws Exception {
-    when(reservationService.reserveStock("PROD-999", 1))
+    when(reservationService.reserveStock("PROD-999", 1, null))
         .thenThrow(new ProductNotFoundException("PROD-999"));
 
     expectProblemDetail(
@@ -118,7 +118,7 @@ class InventoryControllerTest {
 
   @Test
   void reserveInsufficientStockReturnsCustomBadRequest() throws Exception {
-    when(reservationService.reserveStock("PROD-001", 5))
+    when(reservationService.reserveStock("PROD-001", 5, null))
         .thenThrow(new StockUnavailableException("PROD-001", 2));
 
     performReserve("{\"productCode\":\"PROD-001\",\"quantity\":5}")
@@ -131,7 +131,7 @@ class InventoryControllerTest {
 
   @Test
   void unexpectedFailureReturns500ProblemDetail() throws Exception {
-    when(reservationService.reserveStock("PROD-001", 1))
+    when(reservationService.reserveStock("PROD-001", 1, null))
         .thenThrow(new IllegalStateException("boom"));
 
     expectProblemDetail(

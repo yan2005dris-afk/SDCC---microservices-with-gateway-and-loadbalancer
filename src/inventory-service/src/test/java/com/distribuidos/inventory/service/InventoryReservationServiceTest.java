@@ -12,7 +12,9 @@ import com.distribuidos.inventory.dto.ReservationResponse;
 import com.distribuidos.inventory.exception.ProductNotFoundException;
 import com.distribuidos.inventory.exception.StockUnavailableException;
 import com.distribuidos.inventory.model.InventoryProduct;
+import com.distribuidos.inventory.model.StockMovement;
 import com.distribuidos.inventory.repository.InventoryProductRepository;
+import com.distribuidos.inventory.repository.StockMovementRepository;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
@@ -34,12 +36,14 @@ class InventoryReservationServiceTest {
 
   @Mock private InventoryProductRepository repository;
 
+  @Mock private StockMovementRepository stockMovementRepository;
+
   @Test
   void successfulReserveReturnsRemainingStockWithoutEntitySave() {
     when(repository.reserveAtomically("PROD-001", 5)).thenReturn(1);
     when(repository.findByProductCode("PROD-001")).thenReturn(Optional.of(product(45)));
 
-    ReservationResponse response = service().reserveStock("PROD-001", 5);
+    ReservationResponse response = service().reserveStock("PROD-001", 5, null);
 
     assertThat(response.productCode()).isEqualTo("PROD-001");
     assertThat(response.available()).isTrue();
@@ -49,6 +53,7 @@ class InventoryReservationServiceTest {
     assertThat(response.message()).isEqualTo("Reserva confirmada");
     verify(repository).reserveAtomically("PROD-001", 5);
     verify(repository, never()).save(any());
+    verify(stockMovementRepository).save(any(StockMovement.class));
   }
 
   @Test
@@ -56,7 +61,7 @@ class InventoryReservationServiceTest {
     when(repository.reserveAtomically("PROD-999", 1)).thenReturn(0);
     when(repository.findByProductCode("PROD-999")).thenReturn(Optional.empty());
 
-    assertThrows(ProductNotFoundException.class, () -> service().reserveStock("PROD-999", 1));
+    assertThrows(ProductNotFoundException.class, () -> service().reserveStock("PROD-999", 1, null));
   }
 
   @Test
@@ -65,7 +70,8 @@ class InventoryReservationServiceTest {
     when(repository.findByProductCode("PROD-001")).thenReturn(Optional.of(product(2)));
 
     StockUnavailableException exception =
-        assertThrows(StockUnavailableException.class, () -> service().reserveStock("PROD-001", 5));
+        assertThrows(
+            StockUnavailableException.class, () -> service().reserveStock("PROD-001", 5, null));
 
     assertThat(exception.getProductCode()).isEqualTo("PROD-001");
     assertThat(exception.getAvailableStock()).isEqualTo(2);
@@ -92,7 +98,7 @@ class InventoryReservationServiceTest {
             pool.submit(
                 () -> {
                   start.await();
-                  return service().reserveStock("PROD-001", 1);
+                  return service().reserveStock("PROD-001", 1, null);
                 }));
       }
       start.countDown();
@@ -109,7 +115,7 @@ class InventoryReservationServiceTest {
   }
 
   private InventoryReservationService service() {
-    return new InventoryReservationService(repository);
+    return new InventoryReservationService(repository, stockMovementRepository);
   }
 
   private static InventoryProduct product(int stock) {
