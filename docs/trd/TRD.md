@@ -67,14 +67,18 @@
 | `OrderController` | `controller` | Solo HTTP: lee `X-Consistency`, arma `X-Instance-Id` / `X-Database-Node` y devuelve DTO |
 | `OrderQueryService` / `OrderCommandService` | `service` | Casos de uso de lectura y de creación de pedidos |
 | `RoutedReadExecutor` | `datasource` | Política de lectura: elige el nodo, abre **una transacción nueva por intento** (`readOnly`, `REQUIRES_NEW`) y aplica el failover |
-| `ReplicaSelector` → `RoundRobinReplicaSelector` | `datasource` | Round-Robin entre réplicas sanas; `markDown` tras un fallo de conexión; reincorporación cada 5 s (P08) |
+| `ReplicaSelector` → `HealthAwareReplicaSelector` | `datasource` | Round-Robin entre las réplicas **en rotación** según `ReplicaHealthRegistry`; `markDown` retira una réplica en cuanto una petición real falla contra ella |
+| `RoutingDataSourceProperties` + `DbNode` | `datasource` | Primario y N réplicas en `sdcc.datasource.replicas` (`name`, `url`), validados al arrancar; `pool-max-size` acota las conexiones por pool |
+| `ReplicaHealthMonitor` → `ReplicaProbe` (`PostgresReplicaProbe`) | `datasource.health` | Cada `interval` (2 s) sondea **todas** las réplicas en paralelo (hilos virtuales) por un pool exclusivo de 1 conexión. `UP` = `pg_is_in_recovery()` + `pg_stat_wal_receiver.status = 'streaming'` + lag ≤ `max-lag` (5 s); si responde pero no cumple → `LAGGING`; sin conexión o fuera de `probe-timeout` (1 s) → `DOWN` |
+| `ReplicaHealthRegistry` (`ReplicaStatusView`) | `datasource.health` | Estado por réplica con histéresis: sale del balanceo con 1 resultado no `UP`; vuelve tras `rejoin-threshold` (2) sondeos `UP` seguidos (P08). Logs solo en transiciones (`replica.state`, `replica.rotation`) |
+| `DatabaseNodesHealthIndicator` | `datasource.health` | Componente `databaseNodes` de `/actuator/health` (reemplaza al indicador `db`): `UP` con `degraded` si falta una réplica; `DOWN` solo si cae el primario |
 | `TransientConnectionFailures` | `datasource` | Solo se reintentan los fallos de **conexión** (`SQLTransientConnectionException`, SQLState clase `08`…); un error de SQL o de lógica no se reintenta |
 | `DynamicRoutingDataSource` + `LazyConnectionDataSourceProxy` | `datasource` | Enrutan la conexión física según `RoutingContextHolder` (ThreadLocal), que se fija **antes** de la primera sentencia y se limpia siempre |
 | `CorrelationIdFilter` / `CorrelationIdPropagationInterceptor` | `observability` | `X-Correlation-Id` en el MDC y en las llamadas a `inventory-service` |
 
 #### Política de lectura
 1. **Lectura crítica** (`X-Consistency: critical`, P07) → `PRIMARY`, sin reintento.
-2. **Lectura ordinaria** → réplica elegida por Round-Robin. Ante un fallo de conexión, la réplica se retira del reparto y se reintenta en la siguiente, como máximo una vez por réplica (P06).
+2. **Lectura ordinaria** → réplica en rotación elegida por Round-Robin. El sondeo retira una réplica caída en ≤ `interval + probe-timeout` (≈ 3 s) aunque no haya tráfico (P06). Si una petición falla por conexión antes de eso, la réplica se retira al instante y se reintenta en la siguiente, como máximo una vez por réplica. La respuesta incluye `X-Replication-Lag-Ms` (lag del último sondeo) cuando la atiende una réplica.
 3. **Sin réplicas sanas** → último recurso en `PRIMARY` (`sdcc.datasource.read.fallback-to-primary`, `true` por defecto). Costo: en ese caso las lecturas cargan al primario. Si está desactivado, o si el primario también falla, se responde `503`.
 4. **Escrituras** → `PRIMARY`, en una transacción corta. La llamada a `inventory-service` se hace fuera de la transacción.
 
@@ -87,6 +91,8 @@
 | Peor caso de failover | ≈ max(2 s, 0,75 s + 1 s) + lectura | Por debajo del `timelimiter` del Gateway (3 s) |
 
 `spring.jpa.open-in-view: false`: cada transacción usa su propia sesión, y los DTO se materializan dentro de ella.
+
+**Permisos del sondeo:** leer `pg_stat_wal_receiver` requiere superusuario o el rol `pg_monitor`. En la demo, `admin` es superusuario; en producción: `GRANT pg_monitor TO <usuario_app>;`.
 
 ---
 

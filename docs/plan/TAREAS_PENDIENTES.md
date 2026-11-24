@@ -47,6 +47,7 @@ Gestiona pedidos con 2 instancias balanceadas. Contiene el enrutamiento de lectu
   Reincorporar solo si `pg_is_in_recovery() = true` y `lag_seconds` está por debajo de un umbral configurable (por ejemplo 5 s). Registrar en el log el motivo de cada rechazo.
 - **Hecho cuando:** el log muestra que la réplica se reincorpora solo después de alcanzar al primario, y P08 incluye esa evidencia.
 - **Prueba:** P08.
+- **Estado:** resuelto en `feature/order-replica-readiness` (B3): `PostgresReplicaProbe` exige recuperación + `streaming` + lag ≤ 5 s y `rejoin-threshold` (2) sondeos `UP` seguidos. Medido: `to=UP lagMs=0` y `action=JOIN` 2 s después.
 
 #### 🟠 ORD-03 — No se registra en el log el nodo de BD usado en cada operación
 - **Dónde:** [OrderController.java](../../src/order-service/src/main/java/com/distribuidos/order/controller/OrderController.java). Solo se registran los fallos.
@@ -68,6 +69,7 @@ Gestiona pedidos con 2 instancias balanceadas. Contiene el enrutamiento de lectu
 - **Problema:** el `@Scheduled` solo revisa las réplicas ya marcadas como degradadas. Una réplica sana que cae solo se detecta cuando una petición de usuario falla contra ella.
 - **Solución propuesta:** que el health check programado también revise las réplicas sanas y las marque degradadas antes de que les llegue tráfico. Documentar en el informe el tiempo de detección (≤ 5 s).
 - **Prueba:** P06 (tiempo de detección).
+- **Estado:** resuelto en `feature/order-replica-readiness` (B3): `ReplicaHealthMonitor` sondea todas las réplicas cada 2 s (timeout 1 s). Medido sin tráfico: `to=DOWN` 0,3 s después del `docker stop`.
 
 #### 🟡 ORD-06 — El precio y el nombre del producto los define el cliente
 - **Dónde:** [CreateOrderRequest.java](../../src/order-service/src/main/java/com/distribuidos/order/dto/CreateOrderRequest.java) y `buildOrderItem` en el controlador (línea 192: `"Producto " + productCode`).
