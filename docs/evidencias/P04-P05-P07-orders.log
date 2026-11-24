@@ -1,0 +1,49 @@
+P04/P05/P07 - final sanitized HTTP, SQL and log evidence
+POST-success	status=201	cid=sdcc-p04-evidence-order-01	db_node=PRIMARY	instance=order-service-1:8081
+created_order_id=4
+POST-stock-reject	status=400	cid=sdcc-p04-evidence-reject-01	db_node=missing	instance=order-service-2:8083
+GET-critical	status=200	cid=sdcc-p07-evidence-critical-01	db_node=PRIMARY	instance=order-service-1:8081
+critical_read_id_matches=true
+GET-ordinary	status=200	cid=sdcc-p05-evidence-read-01	db_node=REPLICA_2	instance=order-service-2:8083
+listed_order_count=4
+GET-ordinary	status=200	cid=sdcc-p05-evidence-read-02	db_node=REPLICA_1	instance=order-service-1:8081
+listed_order_count=4
+GET-ordinary	status=200	cid=sdcc-p05-evidence-read-03	db_node=REPLICA_1	instance=order-service-2:8083
+listed_order_count=4
+
+SQL verification (no customer data):
+ id |  status
+----+-----------
+  4 | CONFIRMED
+(1 row)
+
+ audit_rows_for_order
+----------------------
+                    0
+(1 row)
+
+
+Sanitized application log prefixes:
+api-gateway	2026-11-24T22:23:30.113Z  INFO 1 --- [api-gateway] [or-http-epoll-7] c.d.g.f.LoggingAndTracingGlobalFilter    : [GATEWAY START] TraceId: sdcc-p04-evidence-order-01 -> POST /api/orders
+api-gateway	2026-11-24T22:23:30.253Z  INFO 1 --- [api-gateway] [or-http-epoll-7] c.d.g.f.LoggingAndTracingGlobalFilter    : [GATEWAY END] TraceId: sdcc-p04-evidence-order-01 -> Status: 201 CREATED en 139 ms (onComplete)
+api-gateway	2026-11-24T22:23:30.272Z  INFO 1 --- [api-gateway] [or-http-epoll-8] c.d.g.f.LoggingAndTracingGlobalFilter    : [GATEWAY START] TraceId: sdcc-p04-evidence-reject-01 -> POST /api/orders
+api-gateway	2026-11-24T22:23:30.295Z  INFO 1 --- [api-gateway] [or-http-epoll-8] c.d.g.f.LoggingAndTracingGlobalFilter    : [GATEWAY END] TraceId: sdcc-p04-evidence-reject-01 -> Status: 400 BAD_REQUEST en 22 ms (onComplete)
+api-gateway	2026-11-24T22:23:30.310Z  INFO 1 --- [api-gateway] [or-http-epoll-9] c.d.g.f.LoggingAndTracingGlobalFilter    : [GATEWAY START] TraceId: sdcc-p07-evidence-critical-01 -> GET /api/orders/4
+api-gateway	2026-11-24T22:23:30.327Z  INFO 1 --- [api-gateway] [or-http-epoll-9] c.d.g.f.LoggingAndTracingGlobalFilter    : [GATEWAY END] TraceId: sdcc-p07-evidence-critical-01 -> Status: 200 OK en 16 ms (onComplete)
+order-service-1	[cid=sdcc-p04-evidence-order-01 inst=order-service-1:8081 db=PRIMARY]
+order-service-1	[cid=sdcc-p04-evidence-order-01 inst=order-service-1:8081 db=]
+order-service-1	[cid=sdcc-p07-evidence-critical-01 inst=order-service-1:8081 db=PRIMARY]
+order-service-2	[cid=sdcc-p04-evidence-reject-01 inst=order-service-2:8083 db=]
+inventory-service	[cid=sdcc-p04-evidence-order-01 inst=inventory-service:8082]
+inventory-service	[cid=sdcc-p04-evidence-reject-01 inst=inventory-service:8082]
+
+P05 correlated application logs:
+api-gateway	2026-11-24T22:23:30.347Z  INFO 1 --- [api-gateway] [r-http-epoll-10] c.d.g.f.LoggingAndTracingGlobalFilter    : [GATEWAY START] TraceId: sdcc-p05-evidence-read-01 -> GET /api/orders
+api-gateway	2026-11-24T22:23:30.354Z  INFO 1 --- [api-gateway] [r-http-epoll-10] c.d.g.f.LoggingAndTracingGlobalFilter    : [GATEWAY END] TraceId: sdcc-p05-evidence-read-01 -> Status: 200 OK en 7 ms (onComplete)
+api-gateway	2026-11-24T22:23:30.374Z  INFO 1 --- [api-gateway] [r-http-epoll-11] c.d.g.f.LoggingAndTracingGlobalFilter    : [GATEWAY START] TraceId: sdcc-p05-evidence-read-02 -> GET /api/orders
+api-gateway	2026-11-24T22:23:30.390Z  INFO 1 --- [api-gateway] [r-http-epoll-11] c.d.g.f.LoggingAndTracingGlobalFilter    : [GATEWAY END] TraceId: sdcc-p05-evidence-read-02 -> Status: 200 OK en 16 ms (onComplete)
+api-gateway	2026-11-24T22:23:30.410Z  INFO 1 --- [api-gateway] [r-http-epoll-12] c.d.g.f.LoggingAndTracingGlobalFilter    : [GATEWAY START] TraceId: sdcc-p05-evidence-read-03 -> GET /api/orders
+api-gateway	2026-11-24T22:23:30.417Z  INFO 1 --- [api-gateway] [r-http-epoll-12] c.d.g.f.LoggingAndTracingGlobalFilter    : [GATEWAY END] TraceId: sdcc-p05-evidence-read-03 -> Status: 200 OK en 7 ms (onComplete)
+order-service-1	[cid=sdcc-p05-evidence-read-02 inst=order-service-1:8081 db=REPLICA_1]
+order-service-2	[cid=sdcc-p05-evidence-read-01 inst=order-service-2:8083 db=REPLICA_2]
+order-service-2	[cid=sdcc-p05-evidence-read-03 inst=order-service-2:8083 db=REPLICA_1]

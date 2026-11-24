@@ -5,13 +5,14 @@ meta {
 }
 
 get {
-  url: {{baseUrl}}/api/orders/1
+  url: {{baseUrl}}/api/orders/{{orderId}}
   body: none
   auth: none
 }
 
 headers {
   X-Consistency: critical
+  X-Correlation-Id: sdcc-bruno-critical
 }
 
 assert {

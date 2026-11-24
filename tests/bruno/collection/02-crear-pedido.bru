@@ -12,12 +12,13 @@ post {
 
 headers {
   Content-Type: application/json
+  X-Correlation-Id: sdcc-bruno-order
 }
 
 body:json {
   {
-    "customerName": "Yandris Rivera",
-    "customerEmail": "yan.2005dris@gmail.com",
+    "customerName": "Cliente Demo",
+    "customerEmail": "demo@example.invalid",
     "productCode": "PROD-001",
     "quantity": 2,
     "unitPrice": 1899.99
@@ -28,4 +29,8 @@ assert {
   res.status: eq 201
   res.headers["x-database-node"]: eq PRIMARY
   res.body.status: eq CONFIRMED
+}
+
+script:post-response {
+  bru.setVar("orderId", res.body.id);
 }

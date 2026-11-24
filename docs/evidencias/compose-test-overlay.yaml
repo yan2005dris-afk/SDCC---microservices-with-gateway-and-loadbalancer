@@ -1,0 +1,4 @@
+services:
+  order-service-2:
+    ports: !override
+      - "18083:8081"

@@ -1,0 +1,323 @@
+[
+  {
+    "iterationIndex": 0,
+    "results": [
+      {
+        "test": {
+          "filename": "01-eureka-apps.bru"
+        },
+        "request": {
+          "method": "GET",
+          "url": "http://localhost:8761/eureka/apps",
+          "headers": {}
+        },
+        "response": {
+          "status": 200,
+          "statusText": "",
+          "headers": {},
+          "url": "http://localhost/eureka/apps",
+          "responseTime": 16,
+          "duration": 16,
+          "size": 3918
+        },
+        "error": null,
+        "status": "pass",
+        "assertionResults": [
+          {
+            "uid": "noiOO2gllHi4WPOgB73SY",
+            "lhsExpr": "res.status",
+            "rhsExpr": "eq 200",
+            "rhsOperand": "200",
+            "operator": "eq",
+            "status": "pass"
+          },
+          {
+            "uid": "i-07EDTGKSWbYr7a60OSR",
+            "lhsExpr": "res.body.applications",
+            "rhsExpr": "isDefined",
+            "rhsOperand": "",
+            "operator": "isDefined",
+            "status": "pass"
+          }
+        ],
+        "testResults": [],
+        "preRequestTestResults": [],
+        "postResponseTestResults": [],
+        "shouldStopRunnerExecution": false,
+        "runDuration": 0.095294197,
+        "name": "01 - Eureka Apps Registry (P01)",
+        "suitename": "/home/yan2005dris-afk/Documentos/GitHub/SDCC---microservices-with-gateway-and-loadbalancer/tests/bruno/collection/01-eureka-apps",
+        "path": "01-eureka-apps",
+        "iterationIndex": 0
+      },
+      {
+        "test": {
+          "filename": "02-crear-pedido.bru"
+        },
+        "request": {
+          "method": "POST",
+          "url": "http://localhost:8080/api/orders",
+          "headers": {}
+        },
+        "response": {
+          "status": 201,
+          "statusText": "Created",
+          "headers": {},
+          "url": "http://localhost/api/orders",
+          "responseTime": 573,
+          "duration": 573,
+          "size": 324
+        },
+        "error": null,
+        "status": "pass",
+        "assertionResults": [
+          {
+            "uid": "lREnnPjlque2bWbxN-O3O",
+            "lhsExpr": "res.status",
+            "rhsExpr": "eq 201",
+            "rhsOperand": "201",
+            "operator": "eq",
+            "status": "pass"
+          },
+          {
+            "uid": "iT3I9hRSDECxyG-0PlYq3",
+            "lhsExpr": "res.headers[\"x-database-node\"]",
+            "rhsExpr": "eq PRIMARY",
+            "rhsOperand": "PRIMARY",
+            "operator": "eq",
+            "status": "pass"
+          },
+          {
+            "uid": "YxkqUFbmqVCrsTwfF18ex",
+            "lhsExpr": "res.body.status",
+            "rhsExpr": "eq CONFIRMED",
+            "rhsOperand": "CONFIRMED",
+            "operator": "eq",
+            "status": "pass"
+          }
+        ],
+        "testResults": [],
+        "preRequestTestResults": [],
+        "postResponseTestResults": [],
+        "shouldStopRunnerExecution": false,
+        "runDuration": 0.710728465,
+        "name": "02 - Crear Pedido Exitoso (P04 y P05)",
+        "suitename": "/home/yan2005dris-afk/Documentos/GitHub/SDCC---microservices-with-gateway-and-loadbalancer/tests/bruno/collection/02-crear-pedido",
+        "path": "02-crear-pedido",
+        "iterationIndex": 0
+      },
+      {
+        "test": {
+          "filename": "03-listar-pedidos.bru"
+        },
+        "request": {
+          "method": "GET",
+          "url": "http://localhost:8080/api/orders",
+          "headers": {}
+        },
+        "response": {
+          "status": 200,
+          "statusText": "OK",
+          "headers": {},
+          "url": "http://localhost/api/orders",
+          "responseTime": 73,
+          "duration": 73,
+          "size": 1933
+        },
+        "error": null,
+        "status": "pass",
+        "assertionResults": [
+          {
+            "uid": "UroDm8qB5FtLVSqI-tGBQ",
+            "lhsExpr": "res.status",
+            "rhsExpr": "eq 200",
+            "rhsOperand": "200",
+            "operator": "eq",
+            "status": "pass"
+          },
+          {
+            "uid": "6WpZesHWAHnxJEHP_4ikR",
+            "lhsExpr": "res.headers[\"x-instance-id\"]",
+            "rhsExpr": "isDefined",
+            "rhsOperand": "",
+            "operator": "isDefined",
+            "status": "pass"
+          },
+          {
+            "uid": "mgCjVVgwIoe1Xf7WxnFeH",
+            "lhsExpr": "res.headers[\"x-database-node\"]",
+            "rhsExpr": "isDefined",
+            "rhsOperand": "",
+            "operator": "isDefined",
+            "status": "pass"
+          }
+        ],
+        "testResults": [],
+        "preRequestTestResults": [],
+        "postResponseTestResults": [],
+        "shouldStopRunnerExecution": false,
+        "runDuration": 0.081773489,
+        "name": "03 - Listar Pedidos Balanceado (P02, P05, P06, P08)",
+        "suitename": "/home/yan2005dris-afk/Documentos/GitHub/SDCC---microservices-with-gateway-and-loadbalancer/tests/bruno/collection/03-listar-pedidos",
+        "path": "03-listar-pedidos",
+        "iterationIndex": 0
+      },
+      {
+        "test": {
+          "filename": "04-lectura-critica.bru"
+        },
+        "request": {
+          "method": "GET",
+          "url": "http://localhost:8080/api/orders/6",
+          "headers": {}
+        },
+        "response": {
+          "status": 200,
+          "statusText": "OK",
+          "headers": {},
+          "url": "http://localhost/api/orders/6",
+          "responseTime": 28,
+          "duration": 28,
+          "size": 321
+        },
+        "error": null,
+        "status": "pass",
+        "assertionResults": [
+          {
+            "uid": "qXEN1Ib3MEzBMQ-0CKXxs",
+            "lhsExpr": "res.status",
+            "rhsExpr": "eq 200",
+            "rhsOperand": "200",
+            "operator": "eq",
+            "status": "pass"
+          },
+          {
+            "uid": "BH9nUdHT_d4iwHll4lVPf",
+            "lhsExpr": "res.headers[\"x-database-node\"]",
+            "rhsExpr": "eq PRIMARY",
+            "rhsOperand": "PRIMARY",
+            "operator": "eq",
+            "status": "pass"
+          }
+        ],
+        "testResults": [],
+        "preRequestTestResults": [],
+        "postResponseTestResults": [],
+        "shouldStopRunnerExecution": false,
+        "runDuration": 0.037430581,
+        "name": "04 - Lectura Critica Inmediata (P07)",
+        "suitename": "/home/yan2005dris-afk/Documentos/GitHub/SDCC---microservices-with-gateway-and-loadbalancer/tests/bruno/collection/04-lectura-critica",
+        "path": "04-lectura-critica",
+        "iterationIndex": 0
+      },
+      {
+        "test": {
+          "filename": "05-stock-inventario.bru"
+        },
+        "request": {
+          "method": "GET",
+          "url": "http://localhost:8080/api/inventory/PROD-001",
+          "headers": {}
+        },
+        "response": {
+          "status": 200,
+          "statusText": "OK",
+          "headers": {},
+          "url": "http://localhost/api/inventory/PROD-001",
+          "responseTime": 14,
+          "duration": 14,
+          "size": 172
+        },
+        "error": null,
+        "status": "pass",
+        "assertionResults": [
+          {
+            "uid": "darqShmQqQ6_TWnaz4Qr_",
+            "lhsExpr": "res.status",
+            "rhsExpr": "eq 200",
+            "rhsOperand": "200",
+            "operator": "eq",
+            "status": "pass"
+          },
+          {
+            "uid": "KQwrqXupgJbtAJc4xNNGB",
+            "lhsExpr": "res.body.stock",
+            "rhsExpr": "isDefined",
+            "rhsOperand": "",
+            "operator": "isDefined",
+            "status": "pass"
+          }
+        ],
+        "testResults": [],
+        "preRequestTestResults": [],
+        "postResponseTestResults": [],
+        "shouldStopRunnerExecution": false,
+        "runDuration": 0.021130621,
+        "name": "05 - Verificar Stock Inventario",
+        "suitename": "/home/yan2005dris-afk/Documentos/GitHub/SDCC---microservices-with-gateway-and-loadbalancer/tests/bruno/collection/05-stock-inventario",
+        "path": "05-stock-inventario",
+        "iterationIndex": 0
+      },
+      {
+        "test": {
+          "filename": "06-stock-insuficiente.bru"
+        },
+        "request": {
+          "method": "POST",
+          "url": "http://localhost:8080/api/orders",
+          "headers": {}
+        },
+        "response": {
+          "status": 400,
+          "statusText": "Bad Request",
+          "headers": {},
+          "url": "http://localhost/api/orders",
+          "responseTime": 350,
+          "duration": 350,
+          "size": 30
+        },
+        "error": null,
+        "status": "pass",
+        "assertionResults": [
+          {
+            "uid": "viDZMQZ24SoaSK3tM-JG3",
+            "lhsExpr": "res.status",
+            "rhsExpr": "eq 400",
+            "rhsOperand": "400",
+            "operator": "eq",
+            "status": "pass"
+          }
+        ],
+        "testResults": [],
+        "preRequestTestResults": [],
+        "postResponseTestResults": [],
+        "shouldStopRunnerExecution": false,
+        "runDuration": 0.35670622,
+        "name": "06 - Rechazar Pedido sin Stock (P04)",
+        "suitename": "/home/yan2005dris-afk/Documentos/GitHub/SDCC---microservices-with-gateway-and-loadbalancer/tests/bruno/collection/06-stock-insuficiente",
+        "path": "06-stock-insuficiente",
+        "iterationIndex": 0
+      }
+    ],
+    "summary": {
+      "totalRequests": 6,
+      "passedRequests": 6,
+      "failedRequests": 0,
+      "errorRequests": 0,
+      "skippedRequests": 0,
+      "skippedByBail": 0,
+      "totalAssertions": 13,
+      "passedAssertions": 13,
+      "failedAssertions": 0,
+      "totalTests": 0,
+      "passedTests": 0,
+      "failedTests": 0,
+      "totalPreRequestTests": 0,
+      "passedPreRequestTests": 0,
+      "failedPreRequestTests": 0,
+      "totalPostResponseTests": 0,
+      "passedPostResponseTests": 0,
+      "failedPostResponseTests": 0
+    }
+  }
+]

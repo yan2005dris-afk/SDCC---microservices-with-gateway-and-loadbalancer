@@ -71,3 +71,15 @@ data/
 docs/architecture/.archify-*
 node_modules/
 package-lock.json
+
+# Sanitized experimental evidence logs
+!docs/evidencias/P01-discovery.log
+!docs/evidencias/P02-loadbalance-startup.log
+!docs/evidencias/P02-gateway-503.log
+!docs/evidencias/P02-loadbalance-startup-ready.log
+!docs/evidencias/P02-loadbalance-stable.log
+!docs/evidencias/P02-fault-injection.log
+!docs/evidencias/P03-order-failover.log
+!docs/evidencias/P04-P05-P07-orders.log
+!docs/evidencias/P06-replica-failover.log
+!docs/evidencias/P08-replica-rejoin.log

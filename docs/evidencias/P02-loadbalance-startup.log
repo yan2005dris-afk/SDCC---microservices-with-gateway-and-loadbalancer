@@ -1,0 +1,120 @@
+P02 startup sample: restart both order services while preserving volumes
+Eureka orders: order-service-1:8081=UP order-service-2:8083=UP
+P02 URL: http://localhost:8080/api/orders
+Solicitudes: 100
+request	http_status	instance_id	database_node	error
+1	503	MISSING	MISSING	http_not_200=503;missing_headers=X-Instance-Id;X-Database-Node
+2	503	MISSING	MISSING	http_not_200=503;missing_headers=X-Instance-Id;X-Database-Node
+3	503	MISSING	MISSING	http_not_200=503;missing_headers=X-Instance-Id;X-Database-Node
+4	503	MISSING	MISSING	http_not_200=503;missing_headers=X-Instance-Id;X-Database-Node
+5	503	MISSING	MISSING	http_not_200=503;missing_headers=X-Instance-Id;X-Database-Node
+6	503	MISSING	MISSING	http_not_200=503;missing_headers=X-Instance-Id;X-Database-Node
+7	503	MISSING	MISSING	http_not_200=503;missing_headers=X-Instance-Id;X-Database-Node
+8	503	MISSING	MISSING	http_not_200=503;missing_headers=X-Instance-Id;X-Database-Node
+9	503	MISSING	MISSING	http_not_200=503;missing_headers=X-Instance-Id;X-Database-Node
+10	503	MISSING	MISSING	http_not_200=503;missing_headers=X-Instance-Id;X-Database-Node
+11	503	MISSING	MISSING	http_not_200=503;missing_headers=X-Instance-Id;X-Database-Node
+12	503	MISSING	MISSING	http_not_200=503;missing_headers=X-Instance-Id;X-Database-Node
+13	503	MISSING	MISSING	http_not_200=503;missing_headers=X-Instance-Id;X-Database-Node
+14	503	MISSING	MISSING	http_not_200=503;missing_headers=X-Instance-Id;X-Database-Node
+15	503	MISSING	MISSING	http_not_200=503;missing_headers=X-Instance-Id;X-Database-Node
+16	503	MISSING	MISSING	http_not_200=503;missing_headers=X-Instance-Id;X-Database-Node
+17	503	MISSING	MISSING	http_not_200=503;missing_headers=X-Instance-Id;X-Database-Node
+18	503	MISSING	MISSING	http_not_200=503;missing_headers=X-Instance-Id;X-Database-Node
+19	503	MISSING	MISSING	http_not_200=503;missing_headers=X-Instance-Id;X-Database-Node
+20	503	MISSING	MISSING	http_not_200=503;missing_headers=X-Instance-Id;X-Database-Node
+21	503	MISSING	MISSING	http_not_200=503;missing_headers=X-Instance-Id;X-Database-Node
+22	503	MISSING	MISSING	http_not_200=503;missing_headers=X-Instance-Id;X-Database-Node
+23	503	MISSING	MISSING	http_not_200=503;missing_headers=X-Instance-Id;X-Database-Node
+24	503	MISSING	MISSING	http_not_200=503;missing_headers=X-Instance-Id;X-Database-Node
+25	503	MISSING	MISSING	http_not_200=503;missing_headers=X-Instance-Id;X-Database-Node
+26	503	MISSING	MISSING	http_not_200=503;missing_headers=X-Instance-Id;X-Database-Node
+27	503	MISSING	MISSING	http_not_200=503;missing_headers=X-Instance-Id;X-Database-Node
+28	503	MISSING	MISSING	http_not_200=503;missing_headers=X-Instance-Id;X-Database-Node
+29	503	MISSING	MISSING	http_not_200=503;missing_headers=X-Instance-Id;X-Database-Node
+30	503	MISSING	MISSING	http_not_200=503;missing_headers=X-Instance-Id;X-Database-Node
+31	503	MISSING	MISSING	http_not_200=503;missing_headers=X-Instance-Id;X-Database-Node
+32	503	MISSING	MISSING	http_not_200=503;missing_headers=X-Instance-Id;X-Database-Node
+33	503	MISSING	MISSING	http_not_200=503;missing_headers=X-Instance-Id;X-Database-Node
+34	503	MISSING	MISSING	http_not_200=503;missing_headers=X-Instance-Id;X-Database-Node
+35	503	MISSING	MISSING	http_not_200=503;missing_headers=X-Instance-Id;X-Database-Node
+36	503	MISSING	MISSING	http_not_200=503;missing_headers=X-Instance-Id;X-Database-Node
+37	503	MISSING	MISSING	http_not_200=503;missing_headers=X-Instance-Id;X-Database-Node
+38	503	MISSING	MISSING	http_not_200=503;missing_headers=X-Instance-Id;X-Database-Node
+39	503	MISSING	MISSING	http_not_200=503;missing_headers=X-Instance-Id;X-Database-Node
+40	503	MISSING	MISSING	http_not_200=503;missing_headers=X-Instance-Id;X-Database-Node
+41	503	MISSING	MISSING	http_not_200=503;missing_headers=X-Instance-Id;X-Database-Node
+42	503	MISSING	MISSING	http_not_200=503;missing_headers=X-Instance-Id;X-Database-Node
+43	503	MISSING	MISSING	http_not_200=503;missing_headers=X-Instance-Id;X-Database-Node
+44	503	MISSING	MISSING	http_not_200=503;missing_headers=X-Instance-Id;X-Database-Node
+45	503	MISSING	MISSING	http_not_200=503;missing_headers=X-Instance-Id;X-Database-Node
+46	503	MISSING	MISSING	http_not_200=503;missing_headers=X-Instance-Id;X-Database-Node
+47	503	MISSING	MISSING	http_not_200=503;missing_headers=X-Instance-Id;X-Database-Node
+48	503	MISSING	MISSING	http_not_200=503;missing_headers=X-Instance-Id;X-Database-Node
+49	503	MISSING	MISSING	http_not_200=503;missing_headers=X-Instance-Id;X-Database-Node
+50	503	MISSING	MISSING	http_not_200=503;missing_headers=X-Instance-Id;X-Database-Node
+51	503	MISSING	MISSING	http_not_200=503;missing_headers=X-Instance-Id;X-Database-Node
+52	503	MISSING	MISSING	http_not_200=503;missing_headers=X-Instance-Id;X-Database-Node
+53	503	MISSING	MISSING	http_not_200=503;missing_headers=X-Instance-Id;X-Database-Node
+54	503	MISSING	MISSING	http_not_200=503;missing_headers=X-Instance-Id;X-Database-Node
+55	503	MISSING	MISSING	http_not_200=503;missing_headers=X-Instance-Id;X-Database-Node
+56	503	MISSING	MISSING	http_not_200=503;missing_headers=X-Instance-Id;X-Database-Node
+57	503	MISSING	MISSING	http_not_200=503;missing_headers=X-Instance-Id;X-Database-Node
+58	503	MISSING	MISSING	http_not_200=503;missing_headers=X-Instance-Id;X-Database-Node
+59	503	MISSING	MISSING	http_not_200=503;missing_headers=X-Instance-Id;X-Database-Node
+60	503	MISSING	MISSING	http_not_200=503;missing_headers=X-Instance-Id;X-Database-Node
+61	503	MISSING	MISSING	http_not_200=503;missing_headers=X-Instance-Id;X-Database-Node
+62	503	MISSING	MISSING	http_not_200=503;missing_headers=X-Instance-Id;X-Database-Node
+63	503	MISSING	MISSING	http_not_200=503;missing_headers=X-Instance-Id;X-Database-Node
+64	503	MISSING	MISSING	http_not_200=503;missing_headers=X-Instance-Id;X-Database-Node
+65	503	MISSING	MISSING	http_not_200=503;missing_headers=X-Instance-Id;X-Database-Node
+66	503	MISSING	MISSING	http_not_200=503;missing_headers=X-Instance-Id;X-Database-Node
+67	503	MISSING	MISSING	http_not_200=503;missing_headers=X-Instance-Id;X-Database-Node
+68	503	MISSING	MISSING	http_not_200=503;missing_headers=X-Instance-Id;X-Database-Node
+69	503	MISSING	MISSING	http_not_200=503;missing_headers=X-Instance-Id;X-Database-Node
+70	503	MISSING	MISSING	http_not_200=503;missing_headers=X-Instance-Id;X-Database-Node
+71	503	MISSING	MISSING	http_not_200=503;missing_headers=X-Instance-Id;X-Database-Node
+72	503	MISSING	MISSING	http_not_200=503;missing_headers=X-Instance-Id;X-Database-Node
+73	503	MISSING	MISSING	http_not_200=503;missing_headers=X-Instance-Id;X-Database-Node
+74	503	MISSING	MISSING	http_not_200=503;missing_headers=X-Instance-Id;X-Database-Node
+75	503	MISSING	MISSING	http_not_200=503;missing_headers=X-Instance-Id;X-Database-Node
+76	503	MISSING	MISSING	http_not_200=503;missing_headers=X-Instance-Id;X-Database-Node
+77	503	MISSING	MISSING	http_not_200=503;missing_headers=X-Instance-Id;X-Database-Node
+78	503	MISSING	MISSING	http_not_200=503;missing_headers=X-Instance-Id;X-Database-Node
+79	503	MISSING	MISSING	http_not_200=503;missing_headers=X-Instance-Id;X-Database-Node
+80	503	MISSING	MISSING	http_not_200=503;missing_headers=X-Instance-Id;X-Database-Node
+81	503	MISSING	MISSING	http_not_200=503;missing_headers=X-Instance-Id;X-Database-Node
+82	503	MISSING	MISSING	http_not_200=503;missing_headers=X-Instance-Id;X-Database-Node
+83	503	MISSING	MISSING	http_not_200=503;missing_headers=X-Instance-Id;X-Database-Node
+84	503	MISSING	MISSING	http_not_200=503;missing_headers=X-Instance-Id;X-Database-Node
+85	503	MISSING	MISSING	http_not_200=503;missing_headers=X-Instance-Id;X-Database-Node
+86	503	MISSING	MISSING	http_not_200=503;missing_headers=X-Instance-Id;X-Database-Node
+87	503	MISSING	MISSING	http_not_200=503;missing_headers=X-Instance-Id;X-Database-Node
+88	503	MISSING	MISSING	http_not_200=503;missing_headers=X-Instance-Id;X-Database-Node
+89	503	MISSING	MISSING	http_not_200=503;missing_headers=X-Instance-Id;X-Database-Node
+90	503	MISSING	MISSING	http_not_200=503;missing_headers=X-Instance-Id;X-Database-Node
+91	503	MISSING	MISSING	http_not_200=503;missing_headers=X-Instance-Id;X-Database-Node
+92	503	MISSING	MISSING	http_not_200=503;missing_headers=X-Instance-Id;X-Database-Node
+93	503	MISSING	MISSING	http_not_200=503;missing_headers=X-Instance-Id;X-Database-Node
+94	503	MISSING	MISSING	http_not_200=503;missing_headers=X-Instance-Id;X-Database-Node
+95	503	MISSING	MISSING	http_not_200=503;missing_headers=X-Instance-Id;X-Database-Node
+96	503	MISSING	MISSING	http_not_200=503;missing_headers=X-Instance-Id;X-Database-Node
+97	503	MISSING	MISSING	http_not_200=503;missing_headers=X-Instance-Id;X-Database-Node
+98	503	MISSING	MISSING	http_not_200=503;missing_headers=X-Instance-Id;X-Database-Node
+99	503	MISSING	MISSING	http_not_200=503;missing_headers=X-Instance-Id;X-Database-Node
+100	503	MISSING	MISSING	http_not_200=503;missing_headers=X-Instance-Id;X-Database-Node
+
+Resumen
+attempts=100
+http_responses=100
+requests_without_response=0
+transport_errors=0
+http_errors=100
+header_errors=100
+request_reconciliation=100/100
+HTTP statuses:
+  503=100
+Instances:
+  UNKNOWN=100
+Database nodes:
+  UNKNOWN=100
