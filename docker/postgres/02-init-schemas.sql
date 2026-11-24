@@ -64,8 +64,8 @@ CREATE TABLE IF NOT EXISTS stock_movement_history (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE UNIQUE INDEX IF NOT EXISTS uq_stock_movement_ref_type
-ON stock_movement_history(reference_order_number, movement_type)
+CREATE UNIQUE INDEX IF NOT EXISTS uq_stock_movement_order_product_type
+ON stock_movement_history(reference_order_number, movement_type, product_code)
 WHERE reference_order_number IS NOT NULL;
 
 -- Seed data inicial para inventario

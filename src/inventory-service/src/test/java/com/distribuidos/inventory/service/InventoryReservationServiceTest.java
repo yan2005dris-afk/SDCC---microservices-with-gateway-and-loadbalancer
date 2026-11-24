@@ -6,11 +6,13 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.distribuidos.inventory.dto.ReservationResponse;
+import com.distribuidos.inventory.exception.InvalidStockReleaseException;
 import com.distribuidos.inventory.exception.ProductNotFoundException;
 import com.distribuidos.inventory.exception.ReservationNotFoundException;
 import com.distribuidos.inventory.exception.StockUnavailableException;
@@ -35,6 +37,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DataIntegrityViolationException;
 
 /** Unit tests for the atomic reservation flow. Real database concurrency belongs to B4-06. */
 @ExtendWith(MockitoExtension.class)
@@ -64,6 +67,11 @@ class InventoryReservationServiceTest {
 
   @Test
   void reserveRecordsReservationMovementWithOrderNumber() {
+    when(repository.findByProductCodeForUpdate("PROD-001"))
+        .thenReturn(Optional.of(product("PROD-001", 50)));
+    when(stockMovementRepository.findByReferenceOrderNumberAndTypeAndProductCode(
+            "ORD-001", MovementType.RESERVATION, "PROD-001"))
+        .thenReturn(Optional.empty());
     when(repository.reserveAtomically("PROD-001", 5)).thenReturn(1);
     when(repository.findByProductCode("PROD-001")).thenReturn(Optional.of(product(45)));
 
@@ -79,10 +87,12 @@ class InventoryReservationServiceTest {
   }
 
   @Test
-  void repeatedReserveWithSameOrderNumberDoesNotDecrementStockAgain() {
-    when(stockMovementRepository.findByReferenceOrderNumberAndType(
-            "ORD-001", MovementType.RESERVATION))
-        .thenReturn(Optional.of(movement(MovementType.RESERVATION, 5, "ORD-001")));
+  void repeatedReserveWithSameOrderAndProductDoesNotDecrementStockAgain() {
+    when(repository.findByProductCodeForUpdate("PROD-001"))
+        .thenReturn(Optional.of(product("PROD-001", 45)));
+    when(stockMovementRepository.findByReferenceOrderNumberAndTypeAndProductCode(
+            "ORD-001", MovementType.RESERVATION, "PROD-001"))
+        .thenReturn(Optional.of(movement("PROD-001", MovementType.RESERVATION, 5, "ORD-001")));
     when(repository.findByProductCode("PROD-001")).thenReturn(Optional.of(product(45)));
 
     ReservationResponse response = service().reserveStock("PROD-001", 5, "ORD-001");
@@ -93,10 +103,55 @@ class InventoryReservationServiceTest {
   }
 
   @Test
+  void sameOrderNumberWithDifferentProductReservesSecondLine() {
+    when(repository.findByProductCodeForUpdate("PROD-002"))
+        .thenReturn(Optional.of(product("PROD-002", 30)));
+    when(stockMovementRepository.findByReferenceOrderNumberAndTypeAndProductCode(
+            "ORD-001", MovementType.RESERVATION, "PROD-002"))
+        .thenReturn(Optional.empty());
+    when(repository.reserveAtomically("PROD-002", 3)).thenReturn(1);
+    when(repository.findByProductCode("PROD-002")).thenReturn(Optional.of(product("PROD-002", 27)));
+
+    ReservationResponse response = service().reserveStock("PROD-002", 3, "ORD-001");
+
+    assertThat(response.productCode()).isEqualTo("PROD-002");
+    assertThat(response.remainingStock()).isEqualTo(27);
+    ArgumentCaptor<StockMovement> captor = ArgumentCaptor.forClass(StockMovement.class);
+    verify(stockMovementRepository).save(captor.capture());
+    assertThat(captor.getValue().getProductCode()).isEqualTo("PROD-002");
+    assertThat(captor.getValue().getType()).isEqualTo(MovementType.RESERVATION);
+  }
+
+  @Test
+  void duplicateInsertRaceIsTreatedAsIdempotentReserve() {
+    when(repository.findByProductCodeForUpdate("PROD-001"))
+        .thenReturn(Optional.of(product("PROD-001", 50)));
+    when(stockMovementRepository.findByReferenceOrderNumberAndTypeAndProductCode(
+            "ORD-001", MovementType.RESERVATION, "PROD-001"))
+        .thenReturn(
+            Optional.empty(),
+            Optional.of(movement("PROD-001", MovementType.RESERVATION, 5, "ORD-001")));
+    when(repository.reserveAtomically("PROD-001", 5)).thenReturn(1);
+    when(repository.findByProductCode("PROD-001")).thenReturn(Optional.of(product(45)));
+    doThrow(new DataIntegrityViolationException("duplicate movement"))
+        .when(stockMovementRepository)
+        .save(any(StockMovement.class));
+
+    ReservationResponse response = service().reserveStock("PROD-001", 5, "ORD-001");
+
+    assertThat(response.remainingStock()).isEqualTo(45);
+  }
+
+  @Test
   void releaseRestoresStockAndRecordsReleaseMovement() {
-    when(stockMovementRepository.findByReferenceOrderNumberAndType(
+    when(stockMovementRepository.findAllByReferenceOrderNumberAndType(
             "ORD-001", MovementType.RESERVATION))
-        .thenReturn(Optional.of(movement(MovementType.RESERVATION, 5, "ORD-001")));
+        .thenReturn(List.of(movement("PROD-001", MovementType.RESERVATION, 5, "ORD-001")));
+    when(repository.findByProductCodeForUpdate("PROD-001"))
+        .thenReturn(Optional.of(product("PROD-001", 45)));
+    when(stockMovementRepository.existsByReferenceOrderNumberAndTypeAndProductCode(
+            "ORD-001", MovementType.RELEASE, "PROD-001"))
+        .thenReturn(false);
     when(repository.releaseAtomically("PROD-001", 5)).thenReturn(1);
 
     Map<String, Object> response = service().releaseStock("ORD-001");
@@ -117,11 +172,13 @@ class InventoryReservationServiceTest {
 
   @Test
   void repeatedReleaseDoesNotRestoreStockAgain() {
-    when(stockMovementRepository.findByReferenceOrderNumberAndType(
+    when(stockMovementRepository.findAllByReferenceOrderNumberAndType(
             "ORD-001", MovementType.RESERVATION))
-        .thenReturn(Optional.of(movement(MovementType.RESERVATION, 5, "ORD-001")));
-    when(stockMovementRepository.existsByReferenceOrderNumberAndType(
-            "ORD-001", MovementType.RELEASE))
+        .thenReturn(List.of(movement("PROD-001", MovementType.RESERVATION, 5, "ORD-001")));
+    when(repository.findByProductCodeForUpdate("PROD-001"))
+        .thenReturn(Optional.of(product("PROD-001", 50)));
+    when(stockMovementRepository.existsByReferenceOrderNumberAndTypeAndProductCode(
+            "ORD-001", MovementType.RELEASE, "PROD-001"))
         .thenReturn(true);
 
     Map<String, Object> response = service().releaseStock("ORD-001");
@@ -135,6 +192,22 @@ class InventoryReservationServiceTest {
   @Test
   void releaseWithoutReservationThrowsReservationNotFound() {
     assertThrows(ReservationNotFoundException.class, () -> service().releaseStock("ORD-999"));
+  }
+
+  @Test
+  void releaseWithoutEnoughReservedStockThrowsControlledException() {
+    when(stockMovementRepository.findAllByReferenceOrderNumberAndType(
+            "ORD-001", MovementType.RESERVATION))
+        .thenReturn(List.of(movement("PROD-001", MovementType.RESERVATION, 5, "ORD-001")));
+    when(repository.findByProductCodeForUpdate("PROD-001"))
+        .thenReturn(Optional.of(product("PROD-001", 45)));
+    when(stockMovementRepository.existsByReferenceOrderNumberAndTypeAndProductCode(
+            "ORD-001", MovementType.RELEASE, "PROD-001"))
+        .thenReturn(false);
+    when(repository.releaseAtomically("PROD-001", 5)).thenReturn(0);
+
+    assertThrows(InvalidStockReleaseException.class, () -> service().releaseStock("ORD-001"));
+    verify(stockMovementRepository, never()).save(any());
   }
 
   @Test
@@ -200,8 +273,13 @@ class InventoryReservationServiceTest {
   }
 
   private static StockMovement movement(MovementType type, int quantity, String orderNumber) {
+    return movement("PROD-001", type, quantity, orderNumber);
+  }
+
+  private static StockMovement movement(
+      String productCode, MovementType type, int quantity, String orderNumber) {
     StockMovement movement = new StockMovement();
-    movement.setProductCode("PROD-001");
+    movement.setProductCode(productCode);
     movement.setType(type);
     movement.setQuantity(quantity);
     movement.setReferenceOrderNumber(orderNumber);
@@ -209,8 +287,12 @@ class InventoryReservationServiceTest {
   }
 
   private static InventoryProduct product(int stock) {
+    return product("PROD-001", stock);
+  }
+
+  private static InventoryProduct product(String productCode, int stock) {
     InventoryProduct product = new InventoryProduct();
-    product.setProductCode("PROD-001");
+    product.setProductCode(productCode);
     product.setStock(stock);
     product.setReservedStock(0);
     product.setName("Laptop Dell XPS 15");

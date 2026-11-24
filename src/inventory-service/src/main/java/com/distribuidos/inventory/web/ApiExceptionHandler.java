@@ -1,5 +1,6 @@
 package com.distribuidos.inventory.web;
 
+import com.distribuidos.inventory.exception.InvalidStockReleaseException;
 import com.distribuidos.inventory.exception.ProductNotFoundException;
 import com.distribuidos.inventory.exception.ReservationNotFoundException;
 import com.distribuidos.inventory.exception.StockUnavailableException;
@@ -64,6 +65,13 @@ public class ApiExceptionHandler {
                 exception.getAvailableStock(),
                 "message",
                 exception.getMessage()));
+  }
+
+  @ExceptionHandler(InvalidStockReleaseException.class)
+  ResponseEntity<ProblemDetail> handleInvalidRelease(
+      InvalidStockReleaseException exception, HttpServletRequest request) {
+    return ResponseEntity.status(HttpStatus.CONFLICT)
+        .body(problem(HttpStatus.CONFLICT, exception.getMessage(), request));
   }
 
   @ExceptionHandler(Exception.class)
