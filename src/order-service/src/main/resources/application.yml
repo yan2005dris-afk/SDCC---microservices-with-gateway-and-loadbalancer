@@ -11,6 +11,9 @@ spring:
     # Tiempo máximo para drenar las peticiones en curso.
     timeout-per-shutdown-phase: 20s
   jpa:
+    # Cada transacción usa su propia sesión y libera la conexión al terminar. Con la
+    # sesión abierta durante toda la petición, los intentos de failover la compartirían.
+    open-in-view: false
     hibernate:
       ddl-auto: update
     show-sql: false
@@ -36,8 +39,31 @@ management:
   endpoint:
     health:
       show-details: always
+      # /actuator/health/readiness decide si la instancia recibe tráfico (Gateway y Docker).
+      # No incluye la BD a propósito: primario y réplicas son compartidos por todas las
+      # instancias, y si su caída marcara DOWN a todas, una réplica caída cortaría el
+      # servicio completo (fallo en cascada). /actuator/health sigue mostrando la BD.
+      probes:
+        enabled: true
+
+logging:
+  pattern:
+    # Contexto de cada línea: correlación (Gateway), instancia y nodo de BD en uso.
+    level: "%5p [cid=%X{correlationId:-} inst=%X{instanceId:-} db=%X{dbNode:-}]"
 
 sdcc:
+  datasource:
+    read:
+      # Si no queda ninguna réplica sana, las lecturas ordinarias van al primario.
+      fallback-to-primary: ${SDCC_READ_FALLBACK_TO_PRIMARY:true}
+      # Presupuesto de tiempo: el failover debe quedar por debajo del timelimiter del
+      # Gateway (3 s). Peor caso = max(socket-timeout, validación + connection-timeout)
+      # + lectura en la otra réplica. socket-timeout cubre una réplica cuya IP
+      # desaparece (docker stop): los paquetes se pierden y, sin él, la consulta
+      # esperaría indefinidamente.
+      replica-connection-timeout: ${SDCC_REPLICA_CONNECTION_TIMEOUT:1s}
+      replica-socket-timeout: ${SDCC_REPLICA_SOCKET_TIMEOUT:2s}
+      primary-connection-timeout: ${SDCC_PRIMARY_CONNECTION_TIMEOUT:3s}
   shutdown:
     # Al apagarse, la instancia se marca DOWN en Eureka y espera este tiempo antes de
     # drenar, para que el Gateway deje de enviarle peticiones nuevas. Peor caso de
