@@ -1,0 +1,23 @@
+P08 - recuperación y reingreso de postgres-replica1
+postgres-replica1
+probe_detection_wait_seconds=4
+restart_started=2026-11-24T17:23:05-05:00
+postgres-replica1
+restored_health=healthy
+streaming_replicas=2
+
+Primary streaming state:
+ application_name |   state   | sync_state
+------------------+-----------+------------
+ walreceiver      | streaming | async
+ walreceiver      | streaming | async
+(2 rows)
+
+
+Requests while waiting for the first REPLICA_1 response:
+request	elapsed_ms	http_status	instance_id	database_node
+1	6905	200	order-service-2:8083	REPLICA_1
+first_replica1_read_elapsed_ms=6906
+requests_until_rejoin=1
+NAME                IMAGE         COMMAND                  SERVICE             CREATED          STATUS                   PORTS
+postgres-replica1   postgres:17   "/bin/bash /scripts/…"   postgres-replica1   10 minutes ago   Up 6 seconds (healthy)   0.0.0.0:5433->5432/tcp, [::]:5433->5432/tcp

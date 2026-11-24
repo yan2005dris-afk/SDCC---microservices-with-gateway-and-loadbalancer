@@ -10,6 +10,10 @@ get {
   auth: none
 }
 
+headers {
+  X-Correlation-Id: sdcc-bruno-list
+}
+
 assert {
   res.status: eq 200
   res.headers["x-instance-id"]: isDefined

@@ -35,23 +35,29 @@ GET {{baseUrl}}/api/inventory/PROD-002
 # @name createOrderSuccess
 POST {{baseUrl}}/api/orders
 Content-Type: application/json
+X-Correlation-Id: sdcc-audit-order
 
 {
-  "customerName": "Yandris Rivera",
-  "customerEmail": "yan.2005dris@gmail.com",
+  "customerName": "Cliente Demo",
+  "customerEmail": "demo@example.invalid",
   "productCode": "PROD-001",
   "quantity": 2,
   "unitPrice": 1899.99
 }
 
+> {%
+client.global.set("orderId", response.body.id);
+%}
+
 ###
 # 4.2 Intentar crear pedido con stock insuficiente (debe responder 400 Bad Request)
 POST {{baseUrl}}/api/orders
 Content-Type: application/json
+X-Correlation-Id: sdcc-audit-reject
 
 {
   "customerName": "Cliente Sin Stock",
-  "customerEmail": "sin_stock@correo.com",
+  "customerEmail": "sin-stock@example.invalid",
   "productCode": "PROD-001",
   "quantity": 9999,
   "unitPrice": 1899.99
@@ -60,9 +66,10 @@ Content-Type: application/json
 ### ------------------------------------------------------------------------------
 ### P07: Consistencia de Lectura Crítica Inmediata (Read-Your-Writes)
 ### ------------------------------------------------------------------------------
-# Consultar inmediatamente el pedido creado forzando lectura en PRIMARY (evita replication lag)
-GET {{baseUrl}}/api/orders/1
+# Consultar inmediatamente el pedido creado por createOrderSuccess usando su ID real
+GET {{baseUrl}}/api/orders/{{orderId}}
 X-Consistency: critical
+X-Correlation-Id: sdcc-audit-critical
 
 ### ------------------------------------------------------------------------------
 ### P02, P05, P06, P08: Lecturas Ordinarias Balanceadas entre Réplicas (Round-Robin)
@@ -70,14 +77,17 @@ X-Consistency: critical
 # Ejecutar consecutivamente para observar la alternancia de X-Database-Node:
 # Petición A -> Esperado: REPLICA_1 (y X-Instance-Id: order-service-1 o 2)
 GET {{baseUrl}}/api/orders
+X-Correlation-Id: sdcc-p05-read-1
 
 ###
 # Petición B -> Esperado: REPLICA_2 (y X-Instance-Id: order-service-2 o 1)
 GET {{baseUrl}}/api/orders
+X-Correlation-Id: sdcc-p05-read-2
 
 ###
 # Petición C -> Esperado: REPLICA_1 (Rotación circular Round-Robin continua)
 GET {{baseUrl}}/api/orders
+X-Correlation-Id: sdcc-p05-read-3
 
 ### ------------------------------------------------------------------------------
 ### Pruebas de Resiliencia: Circuit Breaker Fallback

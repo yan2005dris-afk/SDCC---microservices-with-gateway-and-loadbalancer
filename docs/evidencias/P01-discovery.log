@@ -1,0 +1,33 @@
+P01 - Eureka discovery, Compose health, seed inventory and WAL state
+eureka_http_status=200
+API-GATEWAY	8ab32cac08ed:api-gateway:8080=UP
+ORDER-SERVICE	order-service-1:8081=UP,order-service-2:8083=UP
+INVENTORY-SERVICE	inventory-service:8082=UP
+gateway_health_http_status=200
+NAME                IMAGE                                   COMMAND                  SERVICE             CREATED          STATUS                        PORTS
+api-gateway         sdcc-pdd-junie-test-api-gateway         "java -jar app.jar"      api-gateway         14 minutes ago   Up 13 minutes (healthy)       0.0.0.0:8080->8080/tcp, [::]:8080->8080/tcp
+eureka-server       sdcc-pdd-junie-test-eureka-server       "java -jar app.jar"      eureka-server       14 minutes ago   Up 14 minutes (healthy)       0.0.0.0:8761->8761/tcp, [::]:8761->8761/tcp
+inventory-service   sdcc-pdd-junie-test-inventory-service   "java -jar app.jar"      inventory-service   14 minutes ago   Up 14 minutes (healthy)       0.0.0.0:8082->8082/tcp, [::]:8082->8082/tcp
+order-service-1     sdcc-pdd-junie-test-order-service-1     "java -jar app.jar"      order-service-1     14 minutes ago   Up About a minute (healthy)   0.0.0.0:8081->8081/tcp, [::]:8081->8081/tcp
+order-service-2     sdcc-pdd-junie-test-order-service-2     "java -jar app.jar"      order-service-2     14 minutes ago   Up About a minute (healthy)   0.0.0.0:18083->8081/tcp, [::]:18083->8081/tcp
+postgres-primary    postgres:17                             "docker-entrypoint.s…"   postgres-primary    14 minutes ago   Up 14 minutes (healthy)       0.0.0.0:5435->5432/tcp, [::]:5435->5432/tcp
+postgres-replica1   postgres:17                             "/bin/bash /scripts/…"   postgres-replica1   14 minutes ago   Up 4 minutes (healthy)        0.0.0.0:5433->5432/tcp, [::]:5433->5432/tcp
+postgres-replica2   postgres:17                             "/bin/bash /scripts/…"   postgres-replica2   14 minutes ago   Up 14 minutes (healthy)       0.0.0.0:5434->5432/tcp, [::]:5434->5432/tcp
+
+Inventory rows:
+ product_code | stock | reserved_stock
+--------------+-------+----------------
+ PROD-001     |    40 |             10
+ PROD-002     |    30 |              0
+ PROD-003     |   100 |              0
+ PROD-004     |    75 |              0
+ PROD-005     |    40 |              0
+(5 rows)
+
+
+WAL streaming rows on primary:
+ application_name |   state   | sync_state
+------------------+-----------+------------
+ walreceiver      | streaming | async
+ walreceiver      | streaming | async
+(2 rows)

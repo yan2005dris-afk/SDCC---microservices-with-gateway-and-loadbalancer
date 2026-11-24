@@ -29,11 +29,12 @@ El sistema implementa un dominio de comercio electrónico ligero compuesto por d
                            │                                           │
           ┌────────────────┴────────────────┐                          │
           ▼                                 ▼                          ▼
-┌──────────────────┐              ┌──────────────────┐       ┌────────────────────┐
-│ order-service-1  │ (Port 8081)  │ order-service-2  │(8083) │ inventory-service  │ (Port 8082)
-└─────────┬────────┘              └─────────┬────────┘       └────────────────────┘
-          │                                 │                          │
-          └─────────────────┬───────────────┘                          │
+┌──────────────────────────┐           ┌──────────────────────────┐       ┌──────────────────────────┐
+│ order-service-1          │           │ order-service-2          │       │ inventory-service        │
+│ host :8081 → ctr :8081   │           │ host :8083 → ctr :8081   │       │ host/ctr :8082           │
+└──────────┬───────────────┘           └──────────┬───────────────┘       └──────────────────────────┘
+           │                                       │                              │
+           └─────────────────┬─────────────────────┘                              │
                             ▼                                          │
               ┌───────────────────────────┐                            │
               │ AbstractRoutingDataSource │                            │
@@ -42,26 +43,33 @@ El sistema implementa un dominio de comercio electrónico ligero compuesto por d
             ┌───────────────┼───────────────┐                          │
     (WRITE / CRITICAL_READ) │               │ (ORDINARY READS - R-R)   │ (ISOLATED WRITE)
             ▼               ▼               ▼                          ▼
-     ┌─────────────┐ ┌─────────────┐ ┌─────────────┐            ┌─────────────┐
-     │  pg-primary │ │ pg-replica1 │ │ pg-replica2 │            │  pg-primary │
-     │  Port 5432  │ │  Port 5433  │ │  Port 5434  │            │  (inv_db)   │
-     └──────┬──────┘ └─────────────┘ └─────────────┘            └─────────────┘
-            │ WAL Streaming      │
-            └────────────────────┘
+          ┌─────────────────────────────┐
+          │ postgres-primary            │
+          │ container :5432 / host :5435│
+          │ orders_db + inventory_db    │
+          └──────────────┬──────────────┘
+                         │ WAL streaming
+               ┌─────────┴─────────┐
+               ▼                   ▼
+     ┌────────────────────┐ ┌────────────────────┐
+     │ postgres-replica1  │ │ postgres-replica2  │
+     │ container :5432    │ │ container :5432    │
+     │ host :5433          │ │ host :5434          │
+     └────────────────────┘ └────────────────────┘
 ```
 
 ### Componentes y Contenedores
 
-| Componente | Contenedor | Puerto Host | Descripción |
+| Componente | Contenedor | Puerto Host (contenedor) | Descripción |
 |---|---|---|---|
-| **API Gateway** | `api-gateway` | `8080` | Punto de entrada reactivo, Circuit Breaker (Resilience4j) y LoadBalancer. |
-| **Eureka Server** | `eureka-server` | `8761` | Servidor de descubrimiento y registro de microservicios. |
-| **Order Service (Instancia 1)** | `order-service-1` | `8081` | Transaccional, enrutamiento `AbstractRoutingDataSource`. |
-| **Order Service (Instancia 2)** | `order-service-2` | `8083` | Instancia balanceada para alta disponibilidad HTTP. |
-| **Inventory Service** | `inventory-service` | `8082` | Catálogo de productos y reserva de stock atómica. |
-| **PostgreSQL Primary** | `postgres-primary` | `5435` (configurable con `PG_PRIMARY_PORT`) | Nodo maestro para escrituras y emisión de streaming WAL. |
-| **PostgreSQL Réplica 1** | `postgres-replica1` | `5433` | Réplica física de solo lectura (`hot_standby = on`). |
-| **PostgreSQL Réplica 2** | `postgres-replica2` | `5434` | Réplica física de solo lectura (`hot_standby = on`). |
+| **API Gateway** | `api-gateway` | `8080` (`8080`) | Punto de entrada reactivo, Circuit Breaker (Resilience4j) y LoadBalancer. |
+| **Eureka Server** | `eureka-server` | `8761` (`8761`) | Servidor de descubrimiento y registro de microservicios. |
+| **Order Service (Instancia 1)** | `order-service-1` | `8081` (`8081`) | Transaccional, enrutamiento `AbstractRoutingDataSource`. |
+| **Order Service (Instancia 2)** | `order-service-2` | `8083` (`8081`) | Instancia balanceada; el ID Eureka `order-service-2:8083` es un identificador, no el puerto del contenedor. |
+| **Inventory Service** | `inventory-service` | `8082` (`8082`) | Catálogo de productos y reserva de stock atómica. |
+| **PostgreSQL Primary** | `postgres-primary` | `5435` (`5432`, configurable con `PG_PRIMARY_PORT`) | Nodo maestro para escrituras y emisión de streaming WAL. |
+| **PostgreSQL Réplica 1** | `postgres-replica1` | `5433` (`5432`) | Réplica física de solo lectura (`hot_standby = on`). |
+| **PostgreSQL Réplica 2** | `postgres-replica2` | `5434` (`5432`) | Réplica física de solo lectura (`hot_standby = on`). |
 
 > **Diagrama Interactivo:** Puedes explorar el diagrama interactivo renderizado con Archify en [docs/architecture/architecture.html](docs/architecture/architecture.html) o el diagrama de persistencia en [docs/architecture/stack-diagram-database.html](docs/architecture/stack-diagram-database.html).
 
@@ -93,7 +101,7 @@ Para cumplir con la restricción de que `@Transactional(readOnly = true)` no bal
 2. **`ReplicaLoadBalancer`:**
    - Distribuye las lecturas ordinarias (`GET /api/orders`) alternadamente en **Round-Robin** entre Réplica 1 y Réplica 2.
    - Detecta la caída de una réplica (P06) y desvía transparentemente el tráfico a la réplica sana.
-   - Cuenta con un hilo programado (`@Scheduled`) que ejecuta healthchecks activos (`SELECT 1`) y reincorpora automáticamente las réplicas recuperadas al pool de balanceo (P08).
+   - Cuenta con sondeos activos que consideran apta una réplica solo si está en recuperación, el receptor WAL está en `streaming` y el lag medido es conocido y no supera el umbral configurado (5 s por defecto). Un fallo la saca de rotación; vuelve tras dos sondeos sanos consecutivos (P06/P08).
 3. **Consistencia de Lectura Crítica (P07):**
    - Si la petición incluye la cabecera `X-Consistency: critical`, la consulta se enruta directamente al nodo `PRIMARY`, evitando inconsistencias derivadas del *replication lag* tras crear un registro.
 
@@ -113,18 +121,26 @@ cd SDCC---microservices-with-gateway-and-loadbalancer
 git checkout develop
 ```
 
-### Paso 2: Levantar el Clúster Completo
+### Paso 2: Preparar configuración local
 ```bash
-docker compose up -d --build
+test -e .env || cp .env.example .env
+```
+`.env.example` contiene valores ficticios para pruebas locales. Si modificas `.env`, no lo publiques ni lo agregues al repositorio.
+
+### Paso 3: Levantar el Clúster y esperar salud
+```bash
+docker compose up -d --build --wait --wait-timeout 300
 ```
 
-### Paso 3: Verificar Estado de los Contenedores
+### Paso 4: Verificar contenedores, semillas y replicación
 ```bash
 docker compose ps
+docker compose exec -T postgres-primary sh -lc 'psql -U "$POSTGRES_USER" -d inventory_db -c "SELECT product_code, stock, reserved_stock FROM inventory_products ORDER BY product_code;"'
+docker compose exec -T postgres-primary sh -lc 'psql -U "$POSTGRES_USER" -d postgres -c "SELECT application_name, state, sync_state FROM pg_stat_replication ORDER BY application_name;"'
 ```
-Todos los contenedores deben figurar en estado `Up` o `healthy`.
+Espera a que los servicios con healthcheck estén `healthy`. La consulta de inventario muestra los productos de semilla; la consulta del primario debe mostrar las dos réplicas en `streaming` (replicación asíncrona). No interpretes `Up` por sí solo como disponibilidad funcional.
 
-### Paso 4: Visualizar Logs
+### Paso 5: Visualizar Logs
 ```bash
 # Ver logs de todo el clúster
 docker compose logs -f
@@ -133,6 +149,15 @@ docker compose logs -f
 docker compose logs -f api-gateway
 docker compose logs -f order-service-1
 ```
+
+### Apagar o recuperar componentes sin borrar datos
+Para detener el stack local y conservar los volúmenes, usa `docker compose stop`. **No uses `docker compose down -v`**. Después de una prueba de fallo, restaura cualquier componente detenido y comprueba su salud antes de continuar:
+```bash
+docker start order-service-1
+docker start postgres-replica1
+docker compose ps
+```
+El healthcheck del contenedor réplica confirma `pg_is_in_recovery()`. El reingreso al balanceador de `order-service` exige además receptor WAL `streaming`, lag conocido dentro del límite y dos sondeos sanos consecutivos; verifica lecturas con `X-Database-Node` y, en el primario, el estado `streaming` de `pg_stat_replication`.
 
 ### Alternativa: Despliegue en Modo Clúster (Docker Swarm)
 Si deseas desplegar todo el clúster con alta disponibilidad, red overlay y escalado dinámico en **Docker Swarm**, dispones de los archivos listos en `deploy/`:
@@ -158,13 +183,13 @@ El proyecto incluye suites listas para ejecutar en [tests/http/api-tests.http](t
 | ID | Prueba Experimental | Cómo Verificar / Procedimiento | Resultado Demostrable |
 |---|---|---|---|
 | **P01** | Descubrimiento Dinámico | `curl -H "Accept: application/json" http://localhost:8761/eureka/apps` o abrir `http://localhost:8761`. | Se observan `API-GATEWAY`, `ORDER-SERVICE` (2 instancias) e `INVENTORY-SERVICE` en estado `UP`. |
-| **P02** | Balanceo HTTP (100 reqs) | Ejecutar `./scripts/experiments/test-p02-loadbalance.sh`. | Reparto equitativo (~50% / ~50%) entre `order-service-1:8081` y `order-service-2:8083`. |
-| **P03** | Fallo de Instancia | `docker stop order-service-1` y enviar solicitudes a `http://localhost:8080/api/orders`. | El 100% de las peticiones son atendidas por `order-service-2` sin interrupción ni error 500. |
+| **P02** | Balanceo HTTP (100 reqs) | Confirma ambas instancias `UP` en Eureka y una respuesta HTTP 200 desde cada una a través del Gateway; `UP` por sí solo no confirma que la lista del Gateway se haya propagado. Si hay 503, registra la ventana de arranque y espera la respuesta de ambas antes de medir. Ejecuta `bash scripts/experiments/test-p02-loadbalance.sh`. | El script registra cada código HTTP, instancia, nodo y error; evalúa la distribución observada de las 100 respuestas, sin asumir un reparto exacto. |
+| **P03** | Fallo de Instancia | `docker stop --timeout 40 order-service-1`, envía la tanda del protocolo y luego restaura con `docker start order-service-1`. | Se registran cantidad, códigos HTTP e instancia de cada solicitud durante el fallo y tras restaurar; no se presupone éxito del 100% sin medirlo. |
 | **P04** | Comunicación Inter-Servicios | Enviar `POST http://localhost:8080/api/orders` con un producto de inventario. | `order-service` invoca a `http://inventory-service/api/inventory/reserve` vía Eureka para validar stock antes de crear. |
-| **P05** | Enrutamiento de BD | Realizar un `POST /api/orders` y varios `GET /api/orders`. | El `POST` devuelve `X-Database-Node: PRIMARY`; los `GET` devuelven alternadamente `REPLICA_1` y `REPLICA_2`. |
-| **P06** | Fallo de Réplica | Detener una réplica: `docker stop postgres-replica1` y consultar `GET /api/orders`. | El sistema detecta la degradación y envía el 100% de las lecturas a `REPLICA_2` sin errores. |
-| **P07** | Consistencia de Lectura | Consultar con cabecera: `GET /api/orders/1` con `X-Consistency: critical`. | Se enruta al nodo `PRIMARY` (`X-Database-Node: PRIMARY`), garantizando consistencia inmediata tras escribir. |
-| **P08** | Recuperación de Réplica | Reiniciar la réplica: `docker start postgres-replica1` y esperar 5s. | El healthcheck activo la detecta saludable y la reincorpora automáticamente al balanceo Round-Robin. |
+| **P05** | Enrutamiento de BD | Crear un pedido y hacer varios `GET /api/orders`; registra cabeceras. | Comprueba `PRIMARY` en la escritura y mide los nodos devueltos en las lecturas; no presupone alternancia por petición. |
+| **P06** | Fallo de Réplica | `docker stop --timeout 40 postgres-replica1`, consulta `GET /api/orders` y luego restaura con `docker start postgres-replica1`. | Registra respuestas, cabeceras y errores durante el fallo; la réplica restante debe ser la única elegible cuando se detecte la caída. |
+| **P07** | Consistencia de Lectura | Usa el ID devuelto por el `POST`: `GET /api/orders/{id}` con `X-Consistency: critical`. | Comprueba que la petición devuelve el mismo pedido con `X-Database-Node: PRIMARY`; no afirma garantías más amplias que lo observado. |
+| **P08** | Recuperación de Réplica | `docker start postgres-replica1`; mide hasta salud, WAL `streaming` y reincorporación a lecturas. | Registra el tiempo medido y las cabeceras tras reingreso; la salud Compose por sí sola no prueba que la réplica esté en rotación. |
 
 ---
 
@@ -176,6 +201,8 @@ El proyecto incluye suites listas para ejecutar en [tests/http/api-tests.http](t
 - 📄 [Arquitectura de Base de Datos y Modelo ERD](docs/database/DATABASE_SCHEMA.md)
 - 📄 [Guía de Replicación Física WAL PostgreSQL 17](docs/database/REPLICACION_POSTGRESQL_GUIA.md)
 - 📄 [Protocolo Detallado de Pruebas P01-P08](docs/plan/TEST_PLAN_P01_P08.md)
+- 📄 [Informe experimental P01-P08 y evidencias](docs/plan/INFORME_P01_P08.md)
+- 🎬 [Guion del video demostrativo](docs/plan/GUION_VIDEO.md)
 
 ---
 
@@ -183,6 +210,7 @@ El proyecto incluye suites listas para ejecutar en [tests/http/api-tests.http](t
 
 - **Enlace al Video:** *(Pendiente de grabación con participación de todos los integrantes)*
 - **Duración:** 3 a 5 minutos
+- **Guion y lista de tomas:** [docs/plan/GUION_VIDEO.md](docs/plan/GUION_VIDEO.md)
 - **Contenido del Video:**
   1. Presentación de la arquitectura.
   2. Registro dinámico en Eureka Dashboard.

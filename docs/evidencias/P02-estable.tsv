@@ -1,0 +1,120 @@
+P02 URL: http://localhost:8080/api/orders
+Solicitudes: 100
+request	http_status	instance_id	database_node	error
+1	200	order-service-2:8083	REPLICA_2	none
+2	200	order-service-1:8081	REPLICA_1	none
+3	200	order-service-2:8083	REPLICA_1	none
+4	200	order-service-1:8081	REPLICA_2	none
+5	200	order-service-2:8083	REPLICA_2	none
+6	200	order-service-1:8081	REPLICA_1	none
+7	200	order-service-2:8083	REPLICA_1	none
+8	200	order-service-1:8081	REPLICA_2	none
+9	200	order-service-2:8083	REPLICA_2	none
+10	200	order-service-1:8081	REPLICA_1	none
+11	200	order-service-2:8083	REPLICA_1	none
+12	200	order-service-1:8081	REPLICA_2	none
+13	200	order-service-2:8083	REPLICA_2	none
+14	200	order-service-1:8081	REPLICA_1	none
+15	200	order-service-2:8083	REPLICA_1	none
+16	200	order-service-1:8081	REPLICA_2	none
+17	200	order-service-2:8083	REPLICA_2	none
+18	200	order-service-1:8081	REPLICA_1	none
+19	200	order-service-2:8083	REPLICA_1	none
+20	200	order-service-1:8081	REPLICA_2	none
+21	200	order-service-2:8083	REPLICA_2	none
+22	200	order-service-1:8081	REPLICA_1	none
+23	200	order-service-2:8083	REPLICA_1	none
+24	200	order-service-1:8081	REPLICA_2	none
+25	200	order-service-2:8083	REPLICA_2	none
+26	200	order-service-1:8081	REPLICA_1	none
+27	200	order-service-2:8083	REPLICA_1	none
+28	200	order-service-1:8081	REPLICA_2	none
+29	200	order-service-2:8083	REPLICA_2	none
+30	200	order-service-1:8081	REPLICA_1	none
+31	200	order-service-2:8083	REPLICA_1	none
+32	200	order-service-1:8081	REPLICA_2	none
+33	200	order-service-2:8083	REPLICA_2	none
+34	200	order-service-1:8081	REPLICA_1	none
+35	200	order-service-2:8083	REPLICA_1	none
+36	200	order-service-1:8081	REPLICA_2	none
+37	200	order-service-2:8083	REPLICA_2	none
+38	200	order-service-1:8081	REPLICA_1	none
+39	200	order-service-2:8083	REPLICA_1	none
+40	200	order-service-1:8081	REPLICA_2	none
+41	200	order-service-2:8083	REPLICA_2	none
+42	200	order-service-1:8081	REPLICA_1	none
+43	200	order-service-2:8083	REPLICA_1	none
+44	200	order-service-1:8081	REPLICA_2	none
+45	200	order-service-2:8083	REPLICA_2	none
+46	200	order-service-1:8081	REPLICA_1	none
+47	200	order-service-2:8083	REPLICA_1	none
+48	200	order-service-1:8081	REPLICA_2	none
+49	200	order-service-2:8083	REPLICA_2	none
+50	200	order-service-1:8081	REPLICA_1	none
+51	200	order-service-2:8083	REPLICA_1	none
+52	200	order-service-1:8081	REPLICA_2	none
+53	200	order-service-2:8083	REPLICA_2	none
+54	200	order-service-1:8081	REPLICA_1	none
+55	200	order-service-2:8083	REPLICA_1	none
+56	200	order-service-1:8081	REPLICA_2	none
+57	200	order-service-2:8083	REPLICA_2	none
+58	200	order-service-1:8081	REPLICA_1	none
+59	200	order-service-2:8083	REPLICA_1	none
+60	200	order-service-1:8081	REPLICA_2	none
+61	200	order-service-2:8083	REPLICA_2	none
+62	200	order-service-1:8081	REPLICA_1	none
+63	200	order-service-2:8083	REPLICA_1	none
+64	200	order-service-1:8081	REPLICA_2	none
+65	200	order-service-2:8083	REPLICA_2	none
+66	200	order-service-1:8081	REPLICA_1	none
+67	200	order-service-2:8083	REPLICA_1	none
+68	200	order-service-1:8081	REPLICA_2	none
+69	200	order-service-2:8083	REPLICA_2	none
+70	200	order-service-1:8081	REPLICA_1	none
+71	200	order-service-2:8083	REPLICA_1	none
+72	200	order-service-1:8081	REPLICA_2	none
+73	200	order-service-2:8083	REPLICA_2	none
+74	200	order-service-1:8081	REPLICA_1	none
+75	200	order-service-2:8083	REPLICA_1	none
+76	200	order-service-1:8081	REPLICA_2	none
+77	200	order-service-2:8083	REPLICA_2	none
+78	200	order-service-1:8081	REPLICA_1	none
+79	200	order-service-2:8083	REPLICA_1	none
+80	200	order-service-1:8081	REPLICA_2	none
+81	200	order-service-2:8083	REPLICA_2	none
+82	200	order-service-1:8081	REPLICA_1	none
+83	200	order-service-2:8083	REPLICA_1	none
+84	200	order-service-1:8081	REPLICA_2	none
+85	200	order-service-2:8083	REPLICA_2	none
+86	200	order-service-1:8081	REPLICA_1	none
+87	200	order-service-2:8083	REPLICA_1	none
+88	200	order-service-1:8081	REPLICA_2	none
+89	200	order-service-2:8083	REPLICA_2	none
+90	200	order-service-1:8081	REPLICA_1	none
+91	200	order-service-2:8083	REPLICA_1	none
+92	200	order-service-1:8081	REPLICA_2	none
+93	200	order-service-2:8083	REPLICA_2	none
+94	200	order-service-1:8081	REPLICA_1	none
+95	200	order-service-2:8083	REPLICA_1	none
+96	200	order-service-1:8081	REPLICA_2	none
+97	200	order-service-2:8083	REPLICA_2	none
+98	200	order-service-1:8081	REPLICA_1	none
+99	200	order-service-2:8083	REPLICA_1	none
+100	200	order-service-1:8081	REPLICA_2	none
+
+Resumen
+attempts=100
+http_responses=100
+requests_without_response=0
+transport_errors=0
+http_errors=0
+header_errors=0
+request_reconciliation=100/100
+HTTP statuses:
+  200=100
+Instances:
+  order-service-1:8081=50
+  order-service-2:8083=50
+Database nodes:
+  REPLICA_1=50
+  REPLICA_2=50

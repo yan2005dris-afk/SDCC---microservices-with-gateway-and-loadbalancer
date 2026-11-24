@@ -1,0 +1,53 @@
+P03 - order-service-1 failure, immediate and post-detection traffic, then restore
+order-service-1
+
+phase=immediate
+request	http_status	instance_id	database_node	error
+1	200	order-service-2:8083	REPLICA_2	none
+2	200	order-service-2:8083	REPLICA_1	none
+3	200	order-service-2:8083	REPLICA_2	none
+4	200	order-service-2:8083	REPLICA_1	none
+5	200	order-service-2:8083	REPLICA_2	none
+6	200	order-service-2:8083	REPLICA_1	none
+7	200	order-service-2:8083	REPLICA_2	none
+8	200	order-service-2:8083	REPLICA_1	none
+9	200	order-service-2:8083	REPLICA_2	none
+10	200	order-service-2:8083	REPLICA_1	none
+11	200	order-service-2:8083	REPLICA_2	none
+12	200	order-service-2:8083	REPLICA_1	none
+13	200	order-service-2:8083	REPLICA_2	none
+14	200	order-service-2:8083	REPLICA_1	none
+15	200	order-service-2:8083	REPLICA_2	none
+16	200	order-service-2:8083	REPLICA_1	none
+17	200	order-service-2:8083	REPLICA_2	none
+18	200	order-service-2:8083	REPLICA_1	none
+19	200	order-service-2:8083	REPLICA_2	none
+20	200	order-service-2:8083	REPLICA_1	none
+
+phase=after-4s
+request	http_status	instance_id	database_node	error
+1	200	order-service-2:8083	REPLICA_2	none
+2	200	order-service-2:8083	REPLICA_1	none
+3	200	order-service-2:8083	REPLICA_2	none
+4	200	order-service-2:8083	REPLICA_1	none
+5	200	order-service-2:8083	REPLICA_2	none
+6	200	order-service-2:8083	REPLICA_1	none
+7	200	order-service-2:8083	REPLICA_2	none
+8	200	order-service-2:8083	REPLICA_1	none
+9	200	order-service-2:8083	REPLICA_2	none
+10	200	order-service-2:8083	REPLICA_1	none
+11	200	order-service-2:8083	REPLICA_2	none
+12	200	order-service-2:8083	REPLICA_1	none
+13	200	order-service-2:8083	REPLICA_2	none
+14	200	order-service-2:8083	REPLICA_1	none
+15	200	order-service-2:8083	REPLICA_2	none
+16	200	order-service-2:8083	REPLICA_1	none
+17	200	order-service-2:8083	REPLICA_2	none
+18	200	order-service-2:8083	REPLICA_1	none
+19	200	order-service-2:8083	REPLICA_2	none
+20	200	order-service-2:8083	REPLICA_1	none
+
+Restoring order-service-1
+order-service-1
+restored_health=healthy
+restored_eureka_status=UP
