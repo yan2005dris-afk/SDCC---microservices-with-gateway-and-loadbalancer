@@ -1,6 +1,7 @@
 package com.distribuidos.inventory.web;
 
 import com.distribuidos.inventory.exception.ProductNotFoundException;
+import com.distribuidos.inventory.exception.ReservationNotFoundException;
 import com.distribuidos.inventory.exception.StockUnavailableException;
 import jakarta.servlet.http.HttpServletRequest;
 import java.net.URI;
@@ -39,6 +40,13 @@ public class ApiExceptionHandler {
   @ExceptionHandler(ProductNotFoundException.class)
   ResponseEntity<ProblemDetail> handleProductNotFound(
       ProductNotFoundException exception, HttpServletRequest request) {
+    return ResponseEntity.status(HttpStatus.NOT_FOUND)
+        .body(problem(HttpStatus.NOT_FOUND, exception.getMessage(), request));
+  }
+
+  @ExceptionHandler(ReservationNotFoundException.class)
+  ResponseEntity<ProblemDetail> handleReservationNotFound(
+      ReservationNotFoundException exception, HttpServletRequest request) {
     return ResponseEntity.status(HttpStatus.NOT_FOUND)
         .body(problem(HttpStatus.NOT_FOUND, exception.getMessage(), request));
   }

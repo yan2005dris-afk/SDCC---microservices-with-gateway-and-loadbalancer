@@ -23,4 +23,16 @@ public interface InventoryProductRepository extends JpaRepository<InventoryProdu
        WHERE p.productCode = :code AND p.stock >= :qty
       """)
   int reserveAtomically(@Param("code") String productCode, @Param("qty") int quantity);
+
+  @Modifying
+  @Query(
+      """
+      UPDATE InventoryProduct p
+         SET p.stock = p.stock + :qty,
+             p.reservedStock = p.reservedStock - :qty,
+             p.version = p.version + 1,
+             p.updatedAt = CURRENT_TIMESTAMP
+       WHERE p.productCode = :code
+      """)
+  int releaseAtomically(@Param("code") String productCode, @Param("qty") int quantity);
 }
