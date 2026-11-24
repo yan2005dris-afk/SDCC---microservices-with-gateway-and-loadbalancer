@@ -117,16 +117,19 @@ Catálogo de productos y control de stock (1 instancia). Recibe la llamada de `o
 - **Solución propuesta:**
   - Tests unitarios del controlador: reserva exitosa, stock insuficiente, producto inexistente, parámetros inválidos.
   - Un test de integración con Testcontainers que pruebe el descuento real de stock y el conflicto de `@Version`.
+- **Estado:** resuelto en B4 (`feature/inventory-reserve-hardening`). `inventory-service` tiene 52 tests unitarios/slice y 12 de integración con PostgreSQL real (Testcontainers), ejecutados por `mvn verify`: incluyen el descuento real, la idempotencia, la liberación, la contención con stock escaso (5 éxitos / 15 rechazos) y el conflicto de `@Version` (resuelto con `reserveAtomically` en vez de reintentos). Evidencia: ODDs `B4-01`…`B4-12` en `odd/archive/` y `odd/verification/B4-verification-2026-11-24.md`.
 
 #### 🟠 INV-02 — Entrada sin tipar en `/reserve`
 - **Dónde:** [InventoryController.java:35-37](../../src/inventory-service/src/main/java/com/distribuidos/inventory/controller/InventoryController.java#L35-L37).
 - **Problema:** `(Integer) request.get("quantity")` lanza `ClassCastException` (500) si `quantity` llega como string (`"2"`) o como decimal (`2.0`).
 - **Solución propuesta:** reemplazar `Map<String, Object>` por un `record ReserveStockRequest(String productCode, Integer quantity)` con validación, igual que en `order-service`.
+- **Estado:** resuelto en B4. `ReserveStockRequest` es un `record` validado (`@NotBlank productCode`, `@NotNull @Positive quantity`, `orderNumber` opcional) sobre `spring-boot-starter-validation`; `quantity` como string o decimal devuelve `400 ProblemDetail` en vez de 500 (cubierto por `InventoryControllerTest`).
 
 #### 🟠 INV-03 — Las reservas concurrentes del mismo producto devuelven 500
 - **Dónde:** [InventoryController.java:61-63](../../src/inventory-service/src/main/java/com/distribuidos/inventory/controller/InventoryController.java#L61-L63) y `@Version` en [InventoryProduct.java:33](../../src/inventory-service/src/main/java/com/distribuidos/inventory/model/InventoryProduct.java#L33).
 - **Problema:** cuando dos pedidos reservan el mismo producto a la vez, el segundo lanza `ObjectOptimisticLockingFailureException`, que se convierte en 500. `order-service` lo recibe como "Error al verificar inventario".
 - **Solución propuesta:** reintentar 2–3 veces ante el conflicto (`@Retryable` o un bucle), o devolver `409 Conflict` con un mensaje claro. Es relevante en P02, donde se envían 100 peticiones.
+- **Estado:** resuelto en B4 con la opción de un solo intento y sin reintentos: el descuento es un `UPDATE` condicional (`stock >= :qty`) dentro de la transacción, con la fila bloqueada (`FOR UPDATE`) antes de la comprobación de idempotencia. Si no hay stock, la respuesta es `400` con `available: false` y el stock disponible — nunca un 500. El IT `twentyConcurrentReservesWithScarceStockYieldFiveSuccessesAndFifteenRejections` lo demuestra con 20 hilos reales contra PostgreSQL.
 
 #### 🟠 INV-04 — El formato de error no coincide con el contrato
 - **Dónde:** [InventoryController.java:40-58](../../src/inventory-service/src/main/java/com/distribuidos/inventory/controller/InventoryController.java#L40-L58).
@@ -135,16 +138,19 @@ Catálogo de productos y control de stock (1 instancia). Recibe la llamada de `o
   - El código devuelve `error` y `currentStock`, y en "producto no encontrado" no incluye `available`.
   - "Producto no encontrado" debería ser `404`, no `400`.
 - **Solución propuesta:** unificar la respuesta en un DTO y actualizar el contrato.
+- **Estado:** resuelto en B4. `ApiExceptionHandler` devuelve `ProblemDetail` (`type`, `title`, `status`, `detail`, `instance`) para validación (400), cuerpo ilegible (400), método no permitido (405), tipo de contenido no soportado (415), producto inexistente (404) y error inesperado (500, con traza solo en el log). El 400 por stock insuficiente conserva el formato propio del contrato (`available: false`, `remainingStock`, `message`). Contrato actualizado en `docs/api-contracts/API_CONTRACT.md` §3.
 
 #### 🟡 INV-05 — `/reserve` no devuelve precio ni nombre
 - **Problema:** `order-service` no puede obtener el precio real del producto (ver ORD-06).
 - **Solución propuesta:** agregar `unitPrice` y `name` a la respuesta 200.
+- **Estado:** resuelto en B4. `ReservationResponse` devuelve `productCode`, `available`, `remainingStock`, `unitPrice`, `productName` y `message`. Sigue siendo compatible hacia atrás con el cliente actual de `order-service`. El consumo por parte de `order-service` es ORD-06 (bloque B5).
 
 #### 🟡 INV-06 — El historial de movimientos y la liberación de stock no existen
 - **Problema:** la tabla `stock_movement_history` existe en el esquema pero no tiene entidad ni se escribe. No hay endpoint para liberar stock (`RELEASE`).
 - **Solución propuesta:**
   - Registrar un movimiento `RESERVATION` en cada reserva. Sirve como evidencia de P04.
   - Agregar `POST /api/inventory/release` para la compensación de ORD-07 (opcional).
+- **Estado:** resuelto en B4. La entidad `StockMovement` (+ `MovementType`) se escribe en la **misma transacción** que el `UPDATE` de stock, con `ON CONFLICT DO NOTHING` y el índice único parcial `uq_stock_movement_order_product_type (reference_order_number, movement_type, product_code)` como red de seguridad. `POST /api/inventory/release` existe y es idempotente: el segundo `RELEASE` no devuelve el stock otra vez. Índice adicional `idx_stock_movement_product_code` para consultar movimientos por producto. La compensación desde `order-service` es ORD-07 (bloque B5).
 
 #### 🟡 INV-07 — Falta la gestión de inventario prometida en el PRD
 - **Dónde:** [PRD.md §3](../prd/PRD.md): *"Administrador: consulta y actualiza el stock disponible de productos"*.

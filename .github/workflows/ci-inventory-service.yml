@@ -36,5 +36,5 @@ jobs:
       - name: Lint Analysis (Checkstyle)
         run: mvn -f src/pom.xml checkstyle:check -pl inventory-service
 
-      - name: Compile and Run Tests
-        run: mvn -f src/pom.xml test -pl inventory-service
+      - name: Compile and Run Unit + Integration Tests
+        run: mvn -f src/pom.xml verify -pl inventory-service

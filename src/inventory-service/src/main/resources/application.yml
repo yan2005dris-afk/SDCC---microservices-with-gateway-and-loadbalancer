@@ -13,7 +13,12 @@ spring:
     username: ${DB_USER:admin}
     password: ${DB_PASSWORD:admin_demo_change_me}
     driver-class-name: org.postgresql.Driver
+  jackson:
+    deserialization:
+      accept-float-as-int: false
   jpa:
+    # Sin sesión abierta fuera de transacción: las entidades se serializan con campos planos.
+    open-in-view: false
     hibernate:
       ddl-auto: update
     show-sql: false
@@ -30,6 +35,11 @@ eureka:
   instance:
     prefer-ip-address: true
     instance-id: ${INSTANCE_ID:${spring.application.name}:${server.port}}
+
+logging:
+  pattern:
+    # Contexto de cada línea: correlación (Gateway) e instancia que atendió la petición.
+    level: "%5p [cid=%X{correlationId:-} inst=%X{instanceId:-}]"
 
 management:
   endpoints:

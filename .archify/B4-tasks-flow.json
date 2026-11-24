@@ -1,0 +1,70 @@
+{
+  "schema_version": 1,
+  "diagram_type": "sequence",
+  "meta": {
+    "title": "B4 Execution Flow: inventory-reserve-hardening",
+    "output": ".archify/B4-tasks-flow.html",
+    "viewBox": [1000, 900],
+    "animation": "trace",
+    "visual_preset": "signal-flow",
+    "quality_profile": "showcase"
+  },
+  "participants": [
+    { "id": "dev", "type": "external", "label": "Developer", "sublabel": "Andy" },
+    { "id": "work", "type": "backend", "label": "Work", "sublabel": "B4 Tasks" },
+    { "id": "git", "type": "cloud", "label": "Git", "sublabel": "Commits" },
+    { "id": "ci", "type": "backend", "label": "CI", "sublabel": "mvn verify" }
+  ],
+  "segments": [
+    { "from": 160, "to": 210, "label": "B4-01: DTOs (20 min)" },
+    { "from": 220, "to": 350, "label": "B4-02/03/04: Parallel (70 min)" },
+    { "from": 360, "to": 440, "label": "B4-05: Movements (45 min)" },
+    { "from": 450, "to": 600, "label": "B4-06: Tests (90 min)" },
+    { "from": 610, "to": 720, "label": "Push & PR" }
+  ],
+  "messages": [
+    { "from": "dev", "to": "work", "y": 170, "label": "Start B4", "variant": "emphasis" },
+    { "from": "work", "to": "git", "y": 200, "label": "1. DTOs + Validation", "variant": "default" },
+    { "from": "work", "to": "git", "y": 250, "label": "2. UPDATE Atomic", "variant": "default" },
+    { "from": "work", "to": "git", "y": 280, "label": "3. ProblemDetail", "variant": "default" },
+    { "from": "work", "to": "git", "y": 310, "label": "4. Pricing Response", "variant": "default" },
+    { "from": "work", "to": "git", "y": 370, "label": "5. StockMovement", "variant": "default" },
+    { "from": "work", "to": "git", "y": 460, "label": "6. Tests (unit + integ)", "variant": "default" },
+    { "from": "git", "to": "ci", "y": 540, "label": "mvn verify", "variant": "dashed" },
+    { "from": "ci", "to": "git", "y": 590, "label": "✓ Green", "variant": "return" },
+    { "from": "git", "to": "dev", "y": 680, "label": "Ready: PR + Merge", "variant": "return" }
+  ],
+  "activations": [
+    { "participant": "work", "from": 165, "to": 475, "type": "backend" },
+    { "participant": "git", "from": 195, "to": 600, "type": "cloud" },
+    { "participant": "ci", "from": 535, "to": 595, "type": "backend" }
+  ],
+  "cards": [
+    {
+      "dot": "emerald",
+      "title": "Dependencies",
+      "items": [
+        "B4-01 → (B4-02, B4-03, B4-04 parallel)",
+        "B4-02 → B4-05",
+        "All → B4-06"
+      ]
+    },
+    {
+      "dot": "cyan",
+      "title": "Timeline",
+      "items": [
+        "Critical path: 20 + 30 + 45 + 90 = 185 min (~3h)",
+        "Parallel saves ~70 min"
+      ]
+    },
+    {
+      "dot": "violet",
+      "title": "Outcomes",
+      "items": [
+        "INV-01 to INV-06 resolved",
+        "mvn verify: ✓ green",
+        "Ready for merge"
+      ]
+    }
+  ]
+}
