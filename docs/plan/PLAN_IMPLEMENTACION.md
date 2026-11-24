@@ -91,7 +91,7 @@ flowchart LR
 
 **Tareas:** INF-01, INF-02, INF-03, GW-01 · **Base:** `develop` · **Bloquea:** P05, P06, P08
 
-> **Estado:** ✅ implementado y verificado (18 pasos de prueba manuales + smoke test) en los commits `9e315d8` (infra) y `ce16d7e` (gateway). **Pendiente:** push, PR y merge en `develop`.
+> **Estado:** ✅ implementado y verificado (18 pasos de prueba manuales + smoke test) en los commits `9e315d8` (infra) y `ce16d7e` (gateway). Fusionada en `develop` (PR #6).
 
 ### Objetivo
 Que las dos réplicas hagan `pg_basebackup` contra el primario, queden en `streaming` y que Compose arranque los servicios en el orden correcto.
@@ -133,70 +133,209 @@ Que las dos réplicas hagan `pg_basebackup` contra el primario, queden en `strea
 
 ## B2 · `refactor/order-read-routing`
 
-**Tareas:** ORD-01, ORD-03, ORD-04, ORD-08 · **Base:** `develop` con B1 · **Afecta:** P05, P06, P07
+**Tareas:** ORD-01, ORD-03, ORD-04, ORD-08 · **Base:** `develop` (con B1 fusionada) · **Afecta:** P05, P06, P07
+
+> **Estado:** ✅ implementado y verificado en los commits `27e25fa` (apagado sin errores), `5973d03` (ORD-03), `b8a7f7b` (ORD-01, ORD-04), `d19a930` (ORD-09) y `9fa1bec` (ORD-08). `mvn verify`: 45 tests unitarios + 4 de integración con PostgreSQL real; Spotless y Checkstyle sin errores; smoke test en verde; P05, P06 (a través del Gateway), P07 y P08 comprobados en el clúster; 0 errores con tráfico continuo durante `docker stop` y `docker kill` de `order-service-1`. **Pendiente:** push, PR y merge en `develop`.
+
+### Diagnóstico confirmado en el clúster (con `postgres-replica1` detenida)
+
+| Tarea | Observado | Causa |
+|---|---|---|
+| **ORD-01** | `GET /api/orders` → la primera lectura devuelve **500** (`UnexpectedRollbackException: ... marked as rollback-only`) | Todos los intentos comparten una sola transacción. El fallo de la réplica la marca como rollback-only, y aunque el reintento lee bien, el commit final falla |
+| **ORD-04** | `GET /api/orders/{id}` → **el 50% de las lecturas devuelve 500**, cada una tras unos 3 s | El endpoint no tiene failover y nunca marca la réplica como degradada, así que el Round-Robin la sigue eligiendo |
+| **Presupuesto de tiempo** | Cada fallo tarda 3,0 s (el `connectionTimeout` de Hikari) | Es igual al `timelimiter` del Gateway (3 s). Un failover a través del Gateway superaría el límite y terminaría en 503, aunque se corrija ORD-01 |
+| **ORD-03** | El nodo de BD solo aparece en la cabecera HTTP; el `X-Correlation-Id` no llega a los logs ni a `inventory-service` | No hay MDC ni propagación de la cabecera |
+| **ORD-08** | El test de failover pasa con Mockito, pero en producción falla | No hay transacciones reales en los tests |
+
+### Hallazgos durante la implementación (resueltos en B2)
+
+| # | Problema | Causa | Solución |
+|---|---|---|---|
+| H1 | Con una réplica caída, **las dos** instancias de `order-service` pasaban a `DOWN` y el Gateway respondía 503 con el fallback del Circuit Breaker. Ya ocurría antes de B2; en Swarm habría causado reinicios en bucle | `/actuator/health` incluye el indicador `db` con **todos** los DataSource. El LoadBalancer del Gateway y Docker usaban ese endpoint | Probes de Spring Boot: el Gateway y Docker usan **`/actuator/health/readiness`**, que no depende de la BD compartida y así evita el fallo en cascada. `/actuator/health` sigue mostrando la BD para diagnóstico. Aplicado a `order-service` e `inventory-service` |
+| H2 | 2 de 60 lecturas tardaban 3 s y el Gateway las cortaba | Con `docker stop`, la IP de la réplica desaparece y los paquetes se pierden sin respuesta. Una conexión usada hace menos de 500 ms no se revalida y la consulta esperaba el `socketTimeout` (5 s) | `replica-socket-timeout: 2s`. Peor caso = max(2 s, 0,75 s + 1 s) + lectura < 3 s. El test de integración no lo reproducía porque ahí el puerto rechaza la conexión al instante |
+| H3 | En el CI de GitHub, `OrderReadRoutingIT` recibió un 500 en la primera lectura tras detener `REPLICA_1` (en local no se reproducía) | Una conexión viva del pool se cortó a mitad de la consulta (`EOFException`, fallo de conexión). El rollback de `TransactionTemplate` falló después con "Connection is closed" porque Hikari ya la había cerrado, y Spring propagó **el error del rollback**, que oculta el de la consulta: no se reintentó en `REPLICA_2` | `RoutedReadExecutor` decide el reintento con el error de la consulta y adjunta el del rollback como `suppressed`. Test unitario que reproduce el caso (falla sin la corrección). Además, Testcontainers 1.21.4 en el POM padre: 1.20.5 usa la API 1.32 de Docker, que Docker 29 de los runners rechaza |
+
+### Resultados medidos en el clúster (a través del Gateway)
+
+| Prueba | Antes de B2 | Después de B2 |
+|---|---|---|
+| `GET /api/orders` con `postgres-replica1` detenida | 1.ª petición → **500** (`UnexpectedRollbackException`) | **60/60 → 200** (2 rondas), latencia máx. 1,0–1,2 s |
+| `GET /api/orders/{id}` con `postgres-replica1` detenida | **50 % → 500**, 3 s cada una | Incluido en las 60/60 → 200 |
+| Health con réplica caída | Ambas instancias `DOWN` → 503 del Gateway | readiness `UP`; health completo muestra `replica1DataSource: DOWN` |
+| P08: reiniciar la réplica | — | Vuelve al reparto en ≤ 5 s (`replica.state ... to=UP`) |
+| P05 en logs | Solo cabecera HTTP | `db.route op=WRITE node=PRIMARY` / `op=READ node=REPLICA_n` con `cid` e instancia |
 
 ### Objetivo
-Sacar el enrutamiento y el failover del controlador hacia una capa dedicada. Cada intento de lectura usa su propia transacción, de modo que fallar contra una réplica no contamina el reintento. Además, cada decisión de enrutamiento queda registrada en el log.
+Sacar el enrutamiento y el failover del controlador hacia una capa dedicada y reutilizable. Cada intento de lectura usa su propia transacción. Los tiempos de espera quedan dentro del presupuesto del Gateway, y cada decisión de enrutamiento queda trazada en el log.
 
 ### Diseño
 
+Se mantienen los paquetes actuales (`controller`, `datasource`, `dto`, `model`, `repository`, `loadbalancer`) y se añaden solo `service/` y `observability/`.
+
 ```
-controller/OrderController            ← solo HTTP: parsea X-Consistency, arma headers
+controller/OrderController              ← solo HTTP: lee X-Consistency, arma cabeceras, devuelve DTO
    │
-   ├── service/OrderQueryService      ← listOrders(), findById(id, ConsistencyLevel)
-   └── service/OrderCommandService    ← createOrder(...) (lógica movida tal cual; B5 la amplía)
+   ├── service/OrderQueryService        ← list(), findById(id, ReadPolicy)
+   └── service/OrderCommandService      ← create(...) (lógica movida tal cual; B5 la amplía)
             │
             ▼
-datasource/RoutedReadExecutor         ← ejecuta una lectura con política + failover
-   ├── datasource/ReplicaSelector     ← interfaz: next(), markDown(node)
-   │      └── RoundRobinReplicaSelector (implementación actual renombrada; B3 la reemplaza)
+datasource/RoutedReadExecutor           ← política de lectura: nodo → transacción por intento → failover
+   ├── datasource/ReplicaSelector       ← interfaz: next(): Optional<DataSourceType>, markDown(node), replicaCount()
+   │      └── RoundRobinReplicaSelector (antes ReplicaLoadBalancer; B3 la reemplaza)
+   ├── datasource/TransientConnectionFailures ← decide qué errores se pueden reintentar
    ├── TransactionTemplate (readOnly, REQUIRES_NEW) por intento
    └── RoutingContextHolder (ThreadLocal, siempre limpiado en finally)
+
+observability/CorrelationIdFilter                 ← X-Correlation-Id → MDC (cid, inst)
+observability/CorrelationIdPropagationInterceptor ← X-Correlation-Id → llamadas a inventory-service
 ```
 
-- **`RoutedReadExecutor#execute(ReadPolicy policy, Supplier<T> query) → RoutedResult<T>`**
-  - `ReadPolicy.CRITICAL` → siempre `PRIMARY`, sin reintento.
-  - `ReadPolicy.ORDINARY` → `selector.next()`. Si el fallo es **de conexión** (`CannotCreateTransactionException`, `DataAccessResourceFailureException`, `JDBCConnectionException`), se llama a `markDown(node)` y se reintenta con el siguiente nodo. Como máximo hay tantos intentos como réplicas configuradas.
-  - Si no queda ninguna réplica, se lee del `PRIMARY` cuando `sdcc.datasource.read.fallback-to-primary=true`, que es el valor por defecto.
-  - **Los errores de negocio o de SQL no se reintentan** (por ejemplo, una consulta mal escrita). El `catch (Exception)` actual es demasiado amplio.
-  - `RoutedResult<T>(T value, DataSourceType node, int attempts)` lleva el nodo realmente usado, que el controlador pone en `X-Database-Node`.
-- **Sin `@Transactional` en el controlador.** La transacción la abre el executor con `TransactionTemplate`, después de fijar el `RoutingContextHolder`. `LazyConnectionDataSourceProxy` se mantiene porque garantiza que la conexión física se pide después de elegir el nodo.
-- **Observabilidad (ORD-03):**
-  - `CorrelationIdFilter` (`OncePerRequestFilter`): lee `X-Correlation-Id`, que ya genera el Gateway en `LoggingAndTracingGlobalFilter`, y lo coloca en el MDC junto con `instanceId`.
-  - Un `ClientHttpRequestInterceptor` en el `RestClient` hacia inventario propaga `X-Correlation-Id`.
-  - El executor registra un log por intento:
-    `db.route op=READ policy=ORDINARY node=REPLICA_1 attempt=1 result=OK durationMs=4`
-  - Patrón de log en `application.yml`: `logging.pattern.level: "%5p [cid=%X{correlationId:-} inst=%X{instanceId:-}]"`.
-- **Decisión sobre `order_audit_logs`:** **no** se persisten las lecturas en BD. Escribir en el primario en cada lectura haría que las lecturas dependan de la disponibilidad del primario, que es justo lo que P06 quiere evitar, y añadiría carga. La evidencia de P05 sale de los logs. La tabla se elimina del esquema y de la documentación en B8; si el equipo la quiere mantener, se usa solo para escrituras, dentro de la misma transacción del pedido.
+**Bajo acoplamiento:** el controlador no sabe que existen réplicas. El servicio no sabe cómo se elige el nodo. El executor no sabe qué consulta ejecuta (recibe un `Supplier`). En B3, el health check avanzado solo cambia la implementación de `ReplicaSelector`.
+
+**Renombrado `ReplicaLoadBalancer` → `ReplicaSelector`:** refuerza la aclaración de la consigna de que el balanceo HTTP (Spring Cloud LoadBalancer) y la selección de conexiones de BD son responsabilidades distintas.
+
+#### Núcleo: `RoutedReadExecutor#execute(ReadPolicy, Supplier<T>) → RoutedResult<T>`
+
+```java
+public <T> RoutedResult<T> execute(ReadPolicy policy, Supplier<T> query) {
+  if (policy == ReadPolicy.CRITICAL) {
+    return runOn(DataSourceType.PRIMARY, query, 1);           // P07: lectura crítica al primario
+  }
+  RuntimeException lastFailure = null;
+  int attempt = 0;
+  for (Optional<DataSourceType> node = selector.next();       // vacío = no hay réplicas sanas
+       node.isPresent() && attempt < selector.replicaCount();
+       node = selector.next()) {
+    attempt++;
+    try {
+      return runOn(node.get(), query, attempt);
+    } catch (RuntimeException ex) {
+      if (!TransientConnectionFailures.isTransient(ex)) {
+        throw ex;                                              // error de SQL o de lógica: no se reintenta
+      }
+      selector.markDown(node.get());                          // ORD-01 y ORD-04: siempre se marca
+      lastFailure = ex;
+    }
+  }
+  if (properties.fallbackToPrimary()) {
+    return runOn(DataSourceType.PRIMARY, query, attempt + 1); // último recurso, configurable
+  }
+  throw new ReadNodesUnavailableException(lastFailure);       // → 503
+}
+```
+
+- **Una transacción nueva por intento** (`TransactionTemplate`, `readOnly=true`, `PROPAGATION_REQUIRES_NEW`): un intento fallido no contamina al siguiente. Cierra ORD-01.
+- **Solo se reintentan fallos de conexión:** `TransientConnectionFailures` recorre la cadena de causas y busca `SQLTransientConnectionException` (timeout de Hikari) o un SQLState de la clase `08` (excepción de conexión, estándar de SQL). Un error de SQL o de lógica se propaga sin reintentar.
+- **Reintento seguro:** solo se aplica a lecturas; las escrituras nunca pasan por el executor.
+- **Intentos acotados** al número de réplicas configuradas: no hay tormentas de reintentos.
+- **`Optional` en lugar del centinela `PRIMARY`:** recurrir al primario es una decisión explícita y configurable (`sdcc.datasource.read.fallback-to-primary`, `true` por defecto, que es el comportamiento actual). Se documenta en el TRD con su costo: en ese caso las lecturas cargan al primario.
+- **`RoutedResult<T>(value, node, attempts)`:** el controlador pone en `X-Database-Node` el nodo que **realmente** respondió.
+- **`LazyConnectionDataSourceProxy` se mantiene:** garantiza que la conexión física se pide después de fijar el nodo.
+- **Escrituras:** usan la clave por defecto del `DynamicRoutingDataSource` (`PRIMARY`) dentro de la transacción de `OrderCommandService`.
+
+#### Presupuesto de tiempos
+
+| Parámetro | Hoy | Propuesta | Motivo |
+|---|---|---|---|
+| `connectionTimeout`, pools de réplicas | 3 s | **1 s** | Hay otra réplica disponible, así que conviene fallar rápido |
+| `connectionTimeout`, pool del primario | 3 s | 3 s | Es el último recurso; ahí sí vale la pena esperar |
+| `socketTimeout` JDBC, réplicas | ∞ | **2 s** | Cubre una réplica congelada o cuya IP desapareció (ver H2) |
+| Peor caso de failover | ≈ 3 s + lectura | **≈ max(2 s, 0,75 s + 1 s) + lectura** | Queda por debajo de los 3 s del Gateway |
+
+Todo es configurable en `ReadRoutingProperties` (`@ConfigurationProperties("sdcc.datasource.read")`), con valores por defecto.
+
+#### Sesión, DTO y errores
+- **`spring.jpa.open-in-view: false`:** cada transacción tiene su propia sesión, y la conexión se libera al terminar. Spring Boot ya avisa de este riesgo al arrancar.
+- **DTO `OrderResponse` y `OrderItemResponse`**, mapeados **dentro** de la transacción, con **los mismos nombres de campo** que el JSON actual. Bruno, el `.http` y los clientes no se rompen.
+- **Formato de error sin cambios:** el 503 (ningún nodo disponible) usa el `ApiErrorResponse {"error": ...}` existente, vía `@RestControllerAdvice`. Unificar los errores de ambos servicios con `ProblemDetail` queda para B4/B5.
+
+#### Observabilidad (ORD-03)
+- `CorrelationIdFilter` (`OncePerRequestFilter`): lee `X-Correlation-Id`, que ya genera el Gateway, y lo coloca en el MDC junto con `instanceId`. Lo limpia en `finally`, porque los hilos de Tomcat se reutilizan.
+- `CorrelationIdPropagationInterceptor`: registrado en el `RestClient.Builder` balanceado de `OrderLoadBalancerConfig`; propaga la cabecera a `inventory-service`.
+- Un log por intento y por escritura:
+  `db.route op=READ policy=ORDINARY node=REPLICA_1 attempt=1 result=OK durationMs=4`
+  `db.route op=WRITE node=PRIMARY result=OK`
+- Patrón: `logging.pattern.level: "%5p [cid=%X{correlationId:-} inst=%X{instanceId:-} db=%X{dbNode:-}]"`. Son logs `clave=valor` en texto, como pide la invariante; se pueden pasar a JSON más adelante con `logging.structured.format.console`.
+
+#### Endurecimiento para producción: apagado sin errores (✅ implementado al inicio de la rama)
+
+**Problema:** `docker stop` cortaba las peticiones en curso, y a veces terminaba en `Exited (137)` (cierre forzado). Además, durante la **ventana de descubrimiento**, el Gateway seguía enviando tráfico a la instancia que se apagaba, porque su registro de Eureka y la caché del LoadBalancer tardan en refrescarse.
+
+**Solución en tres capas:**
+
+| Capa | Pieza | Qué hace |
+|---|---|---|
+| 1. Salir del tráfico | `lifecycle/DiscoveryDrainLifecycle` (`order-service`) | Al recibir SIGTERM, y **antes** del apagado del servidor web (fase máxima de `SmartLifecycle`), marca la instancia `DOWN` en Eureka y espera `sdcc.shutdown.drain-delay` (15 s) mientras sigue atendiendo. Cambia el estado **local**, no uno sobrescrito en el servidor, para que la instancia vuelva como `UP` al reiniciar |
+| 2. Drenar | `server.shutdown: graceful` + `timeout-per-shutdown-phase: 20s` (los 4 servicios Spring) | Termina las peticiones en curso antes de cerrar |
+| 3. Red de seguridad | Filtro `Retry` en el Gateway + `httpclient.connect-timeout: 1000` | Si una petición `GET` choca con una instancia caída o que se está apagando, se reintenta en otra instancia (2 reintentos, con espera de 50→200 ms). Solo errores de conexión, 502 y 503; **nunca 500** (`series` vacío, verificado en `/actuator/gateway/routes`) y **nunca `POST`** |
+
+- `stop_grace_period`: 45 s en `order-service-1/2` (15 + 20 + margen) y 30 s en Eureka, el Gateway e `inventory-service`, tanto en Compose como en Swarm.
+- `inventory-service` no lleva la capa 1 porque tiene una sola instancia: no hay otra a la que desviar el tráfico.
+- Espera de 15 s: propagación medida ≈ 9,3–9,7 s; peor caso teórico ≈ 12 s (caché de Eureka 2 s + consulta del registro 5 s + caché del LoadBalancer 5 s).
+
+**Resultados medidos (tráfico continuo por el Gateway):**
+
+| Prueba | Peticiones | Errores | Latencia máx. | Salida del contenedor |
+|---|---|---|---|---|
+| `docker stop order-service-1` (apagado ordenado) | 96 | **0** | 0,39 s | `143` (SIGTERM ordenado, antes `137`) |
+| `docker kill order-service-1` (caída brusca) | 60 | **0** | 1,1 s (connect-timeout + reintento) | — |
+
+**Costo:** `docker stop` de `order-service` tarda unos 15–18 s, por la espera de drenaje. Se puede ajustar con `SDCC_SHUTDOWN_DRAIN_DELAY`, y `0s` lo desactiva.
+
+#### Decisión sobre `order_audit_logs`
+**No** se persisten las lecturas en BD. Escribir en el primario en cada lectura haría que las lecturas dependan del primario, que es justo lo que P06 quiere evitar. La evidencia de P05 sale de los logs. La tabla se elimina o se justifica en B8.
 
 ### Checklist
-- [ ] Crear `service/OrderQueryService` y `service/OrderCommandService`. Mover la lógica fuera de `OrderController`.
-- [ ] Crear `datasource/ReadPolicy` (`ORDINARY`, `CRITICAL`) y `datasource/RoutedResult`.
-- [ ] Extraer la interfaz `datasource/ReplicaSelector`. Renombrar `ReplicaLoadBalancer` → `RoundRobinReplicaSelector implements ReplicaSelector`.
-- [ ] Crear `datasource/RoutedReadExecutor` con `TransactionTemplate` (`readOnly=true`, `PROPAGATION_REQUIRES_NEW`).
-- [ ] Clasificar las excepciones en `datasource/TransientConnectionFailure` (un predicado). Solo esas provocan `markDown` y reintento.
-- [ ] Propiedades `sdcc.datasource.read.fallback-to-primary` en un `@ConfigurationProperties` (`ReadRoutingProperties`).
-- [ ] `GET /api/orders/{id}` usa el mismo executor (ORD-04).
-- [ ] `OrderController`: quitar `@Transactional`; construir los headers a partir de `RoutedResult.node()`.
-- [ ] `config/CorrelationIdFilter` + MDC + `logging.pattern.level`.
-- [ ] Interceptor de `X-Correlation-Id` en el `RestClient` de inventario.
-- [ ] Log `db.route ...` por intento (INFO si va bien, WARN si falla).
+- [x] `service/OrderQueryService` y `service/OrderCommandService`; `OrderController` queda solo con HTTP y sin `@Transactional`.
+- [x] `datasource/ReadPolicy` (`ORDINARY`, `CRITICAL`) y `datasource/RoutedResult`.
+- [x] Interfaz `datasource/ReplicaSelector` (`Optional<DataSourceType> next()`, `markDown`, `replicaCount`); `ReplicaLoadBalancer` → `RoundRobinReplicaSelector`.
+- [x] `datasource/TransientConnectionFailures` (tipo de excepción + SQLState `08`).
+- [x] `datasource/RoutedReadExecutor` con `TransactionTemplate` (`readOnly`, `REQUIRES_NEW`), usado por `list` y por `findById` (ORD-04).
+- [x] `ReadRoutingProperties`: `fallback-to-primary`, `replica-connection-timeout`, `replica-socket-timeout`; aplicadas en `DataSourceConfig`.
+- [x] `dto/OrderResponse` y `dto/OrderItemResponse`, con el mismo JSON que hoy.
+- [x] `spring.jpa.open-in-view: false`.
+- [x] `@RestControllerAdvice`: `ReadNodesUnavailableException` → 503 con `ApiErrorResponse`.
+- [x] `observability/CorrelationIdFilter` + MDC + `logging.pattern.level`.
+- [x] `observability/CorrelationIdPropagationInterceptor` en el `RestClient.Builder` balanceado.
+- [x] Logs `db.route` por intento (INFO si va bien, WARN si falla) y por escritura.
+- [x] Apagado sin errores: `DiscoveryDrainLifecycle` + apagado ordenado + `Retry`/`connect-timeout` en el Gateway + `stop_grace_period` (con tests y medido: 0 errores en `docker stop` y en `docker kill`).
+- [x] TRD §3: actualizar nombres de clases, política de failover, presupuesto de tiempos y "último recurso en el primario".
 
 ### Tests
-- [ ] Unitario `RoutedReadExecutorTest`: un fallo de conexión en `REPLICA_1` → reintenta en `REPLICA_2`; una `SQLGrammarException` no se reintenta; con todas las réplicas caídas → `PRIMARY`; `CRITICAL` → `PRIMARY` directo.
-- [ ] Unitario `OrderControllerTest`: adaptarlo para que use mocks de los servicios en lugar del repositorio.
-- [ ] **Integración (ORD-08)** `OrderReadRoutingIT` con Testcontainers:
-  - 3 contenedores `postgres:17` independientes que hacen de primario, réplica 1 y réplica 2, con el mismo esquema (`@ServiceConnection` no aplica; se usa `@DynamicPropertySource` para `DB_*_URL`).
-  - `eureka.client.enabled=false` y `@MockitoBean InventoryStockClient`.
-  - Caso clave: detener el contenedor de la réplica 1 → 10 llamadas a `GET /api/orders` devuelven **todas** 200 con `X-Database-Node: REPLICA_2`. Este test reproduce y cierra ORD-01.
-  - En los tests no hace falta replicación WAL real; lo que se prueba es el enrutamiento. La restricción del docente sobre réplicas simuladas aplica al sistema entregado, no a los tests.
-- [ ] Dependencias de test en `order-service/pom.xml`: `spring-boot-testcontainers` y `org.testcontainers:postgresql`, con versiones gestionadas por el BOM de Spring Boot 3.4. Agregar `maven-failsafe-plugin` para los `*IT`.
-- [ ] Workflow `ci-order-service.yml`: cambiar `mvn test` por `mvn verify` para que se ejecuten los tests de integración. Docker ya está disponible en `ubuntu-latest`.
+- [x] Unitario `RoutedReadExecutorTest`: un fallo de conexión en `REPLICA_1` → `REPLICA_2` + `markDown`; un error de SQL no se reintenta; sin réplicas → `PRIMARY` o 503 según la configuración; `CRITICAL` → `PRIMARY` directo; el `RoutingContextHolder` y el MDC quedan limpios después de cada intento.
+- [x] Unitario `TransientConnectionFailuresTest`: tipos de excepción y SQLState `08xxx` frente a otros.
+- [x] Unitario `RoundRobinReplicaSelectorTest`: alternancia, `markDown` y `Optional.empty()` sin réplicas sanas.
+- [x] `@WebMvcTest OrderControllerTest`: cabeceras, `X-Consistency`, 404, 503 y forma del JSON, con servicios simulados.
+- [x] **Integración (ORD-08)** `OrderReadRoutingIT` con Testcontainers:
+  - 3 contenedores `postgres:17` independientes (primario, réplica 1 y réplica 2), cada uno con una fila "marcador" distinta, para comprobar **qué base respondió**.
+  - `@DynamicPropertySource` para `DB_*_URL`; `eureka.client.enabled=false`; `@MockitoBean InventoryStockClient`.
+  - Al detener el contenedor de la réplica 1, **todas** las llamadas a `GET /api/orders` y `GET /api/orders/{id}` devuelven 200 desde `REPLICA_2`, en menos de 1,5 s. Cierra ORD-01 y ORD-04.
+  - Una escritura solo aparece en el contenedor primario.
+  - En los tests no hace falta replicación WAL real, porque lo que se prueba es el enrutamiento. La restricción del docente sobre réplicas simuladas aplica al sistema entregado.
+- [x] `pom.xml`: `spring-boot-testcontainers` + `org.testcontainers:postgresql` (versiones gestionadas por el BOM de Spring Boot 3.4) + `maven-failsafe-plugin`.
+- [x] `ci-order-service.yml`: `mvn test` → `mvn verify`.
 
 ### Verificación manual
-- [ ] P05: `POST` → `PRIMARY`; los `GET` alternan `REPLICA_1` y `REPLICA_2`, visible en las cabeceras y en `docker compose logs order-service-1`.
-- [ ] P06: `docker stop postgres-replica1` → todas las lecturas responden 200 desde `REPLICA_2`, incluida la primera.
-- [ ] P07: `GET /{id}` con `X-Consistency: critical` → `PRIMARY`.
+- [x] P05: `POST` → `PRIMARY`; los `GET` alternan réplicas; `docker compose logs order-service-1 | Select-String "db.route"` lo muestra.
+- [x] P06 **a través del Gateway**: con `postgres-replica1` detenida, todas las peticiones a `/api/orders` y `/api/orders/{id}` responden 200 desde `REPLICA_2`, incluida la primera, en menos de 1,5 s.
+- [x] P07: `GET /{id}` con `X-Consistency: critical` → `PRIMARY`.
+- [x] Trazabilidad: el mismo `cid` aparece en los logs del Gateway y de `order-service`, y se propaga como cabecera a `inventory-service`.
+- [ ] Registrar el `cid` en los logs de `inventory-service` → **B4** (añade su `CorrelationIdFilter`).
+- [x] El smoke test de Compose sigue en verde.
+
+### Fuera del alcance de B2
+- Health check activo de todas las réplicas, réplica "apta" según su lag, N réplicas configurables y `X-Replication-Lag-Ms` → **B3**.
+- Precio desde inventario, compensación de stock, timeouts del `RestClient` → **B5**.
+- Unificación de errores con `ProblemDetail` → **B4/B5**.
+- Cambios en el contrato de la API: **ninguno**.
+
+### Riesgos y mitigación
+| Riesgo | Mitigación |
+|---|---|
+| Un acceso lazy fuera de la transacción falla con Open-Session-In-View desactivado | Mapear a DTO dentro de la transacción; lo cubre el test de integración |
+| `MDC` o `ThreadLocal` sucios entre peticiones | Limpieza en `finally`; un test unitario lo verifica |
+| Un reintento suma carga durante una caída | Acotado al número de réplicas; solo para fallos de conexión |
+| Un `connectionTimeout` de 1 s es demasiado agresivo bajo carga | Es configurable; con < 1.000 req/min y pools de 10 conexiones hay margen |
 
 ---
 
@@ -422,7 +561,7 @@ Scripts reproducibles que generen la evidencia que pide el docente: distribució
 - [ ] `test-p08-replica-recovery.sh`: `docker start postgres-replica1` → `pg_stat_replication` → tiempo hasta que `REPLICA_1` vuelve a aparecer en las cabeceras.
 - [ ] Bruno: casos de stock insuficiente, P07 encadenando `res.body.id` con `bru.setVar`, inventario caído (503).
 - [ ] `tests/http/api-tests.http`: igual que Bruno, con `{{createOrderSuccess.response.body.id}}`.
-- [ ] `.gitattributes`: confirmar que `*.sh` usa `eol=lf`.
+- [x] `.gitattributes`: confirmar que `*.sh` usa `eol=lf` (ya presente: `*.sh text eol=lf`).
 
 ---
 
@@ -509,14 +648,17 @@ Marca cada tarea cuando esté **implementada y verificada en su rama**.
 - [x] Smoke test de Compose (`scripts/ci/compose-smoke.sh` + `ci-compose-smoke.yml`)
 
 ### order-service
-- [ ] **ORD-01** El failover de `GET /api/orders` no devuelve 500 — *B2*
+> B2 implementado y verificado en `27e25fa`, `5973d03`, `b8a7f7b`, `d19a930` y `9fa1bec`.
+
+- [x] **ORD-01** El failover de `GET /api/orders` no devuelve 500 — *B2*
 - [ ] **ORD-02** Reincorporación de réplicas solo cuando están aptas (recuperación + streaming + lag) — *B3*
-- [ ] **ORD-03** Logs del nodo de BD por operación + `correlationId` — *B2*
-- [ ] **ORD-04** Failover en `GET /api/orders/{id}` — *B2*
+- [x] **ORD-03** Logs del nodo de BD por operación + `correlationId` — *B2*
+- [x] **ORD-04** Failover en `GET /api/orders/{id}` — *B2*
 - [ ] **ORD-05** Detección proactiva de réplicas caídas — *B3*
 - [ ] **ORD-06** Precio y nombre del producto desde inventario — *B5*
 - [ ] **ORD-07** Compensación `release` si falla la persistencia — *B5*
-- [ ] **ORD-08** Tests de integración con Testcontainers + `mvn verify` en CI — *B2 (ampliado en B3)*
+- [x] **ORD-08** Tests de integración con Testcontainers + `mvn verify` en CI — *B2 (se amplía en B3)*
+- [x] **ORD-09** Health de tráfico sin dependencia de la BD compartida (readiness) — *B2, hallazgo H1*
 - [ ] Cabecera `X-Replication-Lag-Ms` — *B3*
 
 ### inventory-service

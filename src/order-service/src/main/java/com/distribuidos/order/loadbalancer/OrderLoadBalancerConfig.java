@@ -1,5 +1,6 @@
 package com.distribuidos.order.loadbalancer;
 
+import com.distribuidos.order.observability.CorrelationIdPropagationInterceptor;
 import org.springframework.cloud.client.loadbalancer.LoadBalanced;
 import org.springframework.cloud.loadbalancer.annotation.LoadBalancerClients;
 import org.springframework.context.annotation.Bean;
@@ -13,13 +14,14 @@ public class OrderLoadBalancerConfig {
 
   /**
    * Expone el constructor de {@link RestClient} habilitado para resolución lógica vía Eureka.
+   * Propaga el {@code X-Correlation-Id} de la petición en curso a los servicios llamados.
    *
    * @return constructor balanceado de {@link RestClient}.
    */
   @Bean
   @LoadBalanced
   public RestClient.Builder loadBalancedRestClientBuilder() {
-    return RestClient.builder();
+    return RestClient.builder().requestInterceptor(new CorrelationIdPropagationInterceptor());
   }
 
   /**

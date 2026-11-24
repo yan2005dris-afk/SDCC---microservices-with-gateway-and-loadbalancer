@@ -1,16 +1,20 @@
 server:
   port: ${SERVER_PORT:8080}
+  shutdown: graceful
 
 spring:
   application:
     name: api-gateway
+  lifecycle:
+    timeout-per-shutdown-phase: 20s
   cloud:
     loadbalancer:
       health-check:
         initial-delay: 1s
         interval: 5s
         path:
-          default: /actuator/health
+          # Readiness: no depende de la BD compartida (ver order-service).
+          default: /actuator/health/readiness
       cache:
         enabled: true
         ttl: 5s
@@ -18,6 +22,10 @@ spring:
       discovery:
         locator:
           enabled: false
+      httpclient:
+        # Sin esto Netty espera hasta 45 s para conectar con una instancia que ya no existe;
+        # con 1 s el reintento llega a otra instancia dentro del timelimiter (3 s).
+        connect-timeout: 1000
       routes:
         # Ruta 1: Microservicio de Pedidos con Circuit Breaker y LoadBalancer
         - id: order-service-route
@@ -29,6 +37,22 @@ spring:
               args:
                 name: orderCircuitBreaker
                 fallbackUri: forward:/fallback/orders
+            # Red de seguridad para la ventana de descubrimiento: si una instancia se está
+            # apagando o acaba de caer, reintenta en otra (el LoadBalancer vuelve a elegir).
+            # Solo GET (idempotente) y solo errores de conexión, 502 o 503; nunca 500, para
+            # no ocultar errores de la aplicación. Los POST no se reintentan (duplicarían pedidos).
+            - name: Retry
+              args:
+                retries: 2
+                methods: GET
+                series:
+                statuses: BAD_GATEWAY, SERVICE_UNAVAILABLE
+                exceptions: java.io.IOException
+                backoff:
+                  firstBackoff: 50ms
+                  maxBackoff: 200ms
+                  factor: 2
+                  basedOnPreviousValue: false
 
         # Ruta 2: Microservicio de Inventario con Circuit Breaker y LoadBalancer
         - id: inventory-service-route
@@ -40,6 +64,18 @@ spring:
               args:
                 name: inventoryCircuitBreaker
                 fallbackUri: forward:/fallback/inventory
+            - name: Retry
+              args:
+                retries: 2
+                methods: GET
+                series:
+                statuses: BAD_GATEWAY, SERVICE_UNAVAILABLE
+                exceptions: java.io.IOException
+                backoff:
+                  firstBackoff: 50ms
+                  maxBackoff: 200ms
+                  factor: 2
+                  basedOnPreviousValue: false
 
 # Configuración de Resilience4j Circuit Breaker
 resilience4j:
@@ -77,7 +113,7 @@ eureka:
 sdcc:
   loadbalancer:
     health-check-interval: 5s
-    health-check-path: /actuator/health
+    health-check-path: /actuator/health/readiness
     cache-ttl: 5s
 
 management:
