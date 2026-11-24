@@ -9,10 +9,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.distribuidos.inventory.dto.ReservationResponse;
 import com.distribuidos.inventory.exception.ProductNotFoundException;
+import com.distribuidos.inventory.exception.ReservationNotFoundException;
 import com.distribuidos.inventory.exception.StockUnavailableException;
 import com.distribuidos.inventory.repository.InventoryProductRepository;
 import com.distribuidos.inventory.service.InventoryReservationService;
 import java.math.BigDecimal;
+import java.util.Map;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -26,6 +28,7 @@ import org.springframework.test.web.servlet.ResultActions;
 class InventoryControllerTest {
 
   private static final String RESERVE_URL = "/api/inventory/reserve";
+  private static final String RELEASE_URL = "/api/inventory/release";
 
   @Autowired private MockMvc mockMvc;
 
@@ -130,6 +133,50 @@ class InventoryControllerTest {
   }
 
   @Test
+  void releaseReturnsRestoredStockResponse() throws Exception {
+    when(reservationService.releaseStock("ORD-001"))
+        .thenReturn(
+            Map.of(
+                "productCode",
+                "PROD-001",
+                "quantity",
+                5,
+                "message",
+                "Stock liberado exitosamente"));
+
+    performRelease("{\"orderNumber\":\"ORD-001\"}")
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.productCode").value("PROD-001"))
+        .andExpect(jsonPath("$.quantity").value(5))
+        .andExpect(jsonPath("$.message").value("Stock liberado exitosamente"));
+
+    verify(reservationService).releaseStock("ORD-001");
+  }
+
+  @Test
+  void releaseRejectsBlankOrderNumberWithProblemDetail() throws Exception {
+    expectProblemDetail(
+        performRelease("{\"orderNumber\":\"\"}"),
+        400,
+        "Bad Request",
+        "orderNumber no puede estar vacío",
+        RELEASE_URL);
+  }
+
+  @Test
+  void releaseWithoutReservationReturns404ProblemDetail() throws Exception {
+    when(reservationService.releaseStock("ORD-999"))
+        .thenThrow(new ReservationNotFoundException("ORD-999"));
+
+    expectProblemDetail(
+        performRelease("{\"orderNumber\":\"ORD-999\"}"),
+        404,
+        "Not Found",
+        "Reserva no encontrada: ORD-999",
+        RELEASE_URL);
+  }
+
+  @Test
   void unexpectedFailureReturns500ProblemDetail() throws Exception {
     when(reservationService.reserveStock("PROD-001", 1, null))
         .thenThrow(new IllegalStateException("boom"));
@@ -160,5 +207,9 @@ class InventoryControllerTest {
 
   private ResultActions performReserve(String body) throws Exception {
     return mockMvc.perform(post(RESERVE_URL).contentType(MediaType.APPLICATION_JSON).content(body));
+  }
+
+  private ResultActions performRelease(String body) throws Exception {
+    return mockMvc.perform(post(RELEASE_URL).contentType(MediaType.APPLICATION_JSON).content(body));
   }
 }
