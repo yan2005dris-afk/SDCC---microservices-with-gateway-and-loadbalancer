@@ -107,10 +107,13 @@ Prefijo en Gateway: `/api/inventory`
 - **Request Body:**
   ```json
   {
+    "orderNumber": "ORD-001",
     "productCode": "PROD-001",
     "quantity": 2
   }
   ```
+  `orderNumber` es opcional. Cuando se envía, la idempotencia se keyea por
+  `(orderNumber, productCode)`: una petición repetida responde `200` sin descontar stock dos veces.
 - **Response `200 OK`:**
   ```json
   {
@@ -130,7 +133,46 @@ Prefijo en Gateway: `/api/inventory`
 
 ---
 
-### 3.2 Consultar Stock de un Producto
+### 3.2 Liberar Stock
+- **Método:** `POST /api/inventory/release`
+- **Request Body:**
+  ```json
+  {
+    "orderNumber": "ORD-001"
+  }
+  ```
+- **Response `200 OK`** (incluye las líneas liberadas; las claves de la primera línea se mantienen
+  por compatibilidad con clientes que esperaban una sola línea):
+  ```json
+  {
+    "productCode": "PROD-001",
+    "quantity": 2,
+    "message": "Stock liberado exitosamente",
+    "orderNumber": "ORD-001",
+    "releases": [
+      {
+        "productCode": "PROD-001",
+        "quantity": 2,
+        "message": "Stock liberado exitosamente"
+      }
+    ]
+  }
+  ```
+- **Idempotencia:** repetir el mismo `orderNumber` responde `200` y **no** vuelve a sumar stock.
+  La garantía es: lock de fila del producto, inserción del movimiento con `ON CONFLICT DO NOTHING`,
+  índice único parcial `(reference_order_number, movement_type, product_code)`.
+- **Response `409 Conflict`:** la liberación excedería el stock reservado del producto.
+  ```json
+  {
+    "status": 409,
+    "detail": "No hay stock reservado suficiente para liberar PROD-001",
+    "instance": "/api/inventory/release"
+  }
+  ```
+
+---
+
+### 3.3 Consultar Stock de un Producto
 - **Método:** `GET /api/inventory/{productCode}`
 - **Response `200 OK`:**
   ```json

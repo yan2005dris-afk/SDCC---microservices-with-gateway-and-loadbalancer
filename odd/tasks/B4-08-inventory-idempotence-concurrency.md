@@ -109,19 +109,24 @@ Final: stock >= 0, reserved_stock >= 0 (invariantes mantenidas)
 > La evidencia completa está en `odd/tasks/B4-08-apply-progress.md`.
 > La S3 original ("50 threads reserve + release") fue **sustituida** por la errata E2.4: el camino real que
 > produce `reservedStock < 0` es **liberar más de lo reservado**, no la concurrencia simétrica.
+>
+> Actualización B4-11: el 200 idempotente ya **no** depende de capturar `DataIntegrityViolationException`.
+> El movimiento se inserta antes del UPDATE con `ON CONFLICT (reference_order_number, movement_type,
+> product_code) WHERE reference_order_number IS NOT NULL DO NOTHING`; en conflicto se re-lee el movimiento
+> ganador y se responde 200 sin tocar el stock. La garantía real es: lock de fila → `ON CONFLICT` → índice
+> único parcial. El bloque WARN de B4-08 queda cerrado por B4-11 + B4-12.
 
 - [x] Búsqueda de movimiento anterior por `reference_order_number` + `movement_type` + `product_code` (errata E1)
 - [x] Segunda `/reserve` del mismo orderNumber **y mismo producto** → 200 (no descuenta)
 - [x] Mismo orderNumber con **producto distinto** → reserva la segunda línea (este caso fallaba antes)
-- [x] `DataIntegrityViolationException` capturado — **pero el camino no entrega el 200 idempotente prometido**
-      (la transacción queda *rollback-only* → `UnexpectedRollbackException` → 500). Ver **B4-11**.
+- [x] `DataIntegrityViolationException` capturado en B4-08 — **pero el camino no entregaba el 200 idempotente
+      prometido**. Sustituido en B4-11 por `ON CONFLICT DO NOTHING` + re-lectura del ganador, sin excepción.
 - [x] 20 threads `/reserve` (mismo order + producto) → 20 × 200, stock decrementó 1 vez (verificado con probe
-      H2 contra el esquema real; el IT de Postgres sigue sin ejecutarse localmente por falta de Docker)
+      H2 contra el esquema real y con ITs de Postgres real en B4-12, 0 omitidos)
 - [x] Liberar más de lo reservado → **409 controlado**, `reserved_stock` nunca negativo (errata E2.4)
 - [x] Constraint `CHECK (reserved_stock >= 0)` en tabla + índice único `(order, type, product)` + script de
       migración para BDs ya inicializadas
-- [ ] Tests concurrencia verdes (Testcontainers PostgreSQL real) — **4 ITs `skipped`**: el daemon de Docker está
-      caído en este entorno. Es el único ítem que impide dar QA-ready.
+- [x] Tests concurrencia verdes (Testcontainers PostgreSQL real) — B4-12 ejecuta 5 ITs con Docker, 0 omitidos.
 - [x] `mvn verify -pl inventory-service` pasa
 - [x] `mvn spotless:check -pl inventory-service` pasa
 
@@ -146,3 +151,9 @@ sesión envenenada lanza `AssertionFailure`; hoy eso es **inalcanzable** porque 
 fila de producto serializa a los competidores, así que la garantía real la da el lock y no el índice único;
 (2) el guard `p.reservedStock >= :qty` de `releaseAtomically` **no está cubierto** por ninguna prueba ejecutable en
 este entorno (el mutante sobrevive): solo lo cubre el IT de Postgres, que queda `skipped` sin Docker.
+
+**L3:** 2026-11-24 — Decisión del humano: opción A de B4-11. La idempotencia pasa a ser real con inserción
+`ON CONFLICT DO NOTHING`, movimiento insertado antes del UPDATE de stock y re-lectura del ganador en conflicto.
+El índice único parcial pasa a estar activamente ejercitado por el IT de Postgres de B4-12; el lock de fila sigue
+siendo la primera barrera de serialización. B4-11 cierra el WARN (1) con `ON CONFLICT` y el WARN (2) con el test de
+slice `releaseBelowReservedStockUpdatesNoRows` (mutante M1 muerto); B4-12 elimina el `skipped` silencioso de los ITs.

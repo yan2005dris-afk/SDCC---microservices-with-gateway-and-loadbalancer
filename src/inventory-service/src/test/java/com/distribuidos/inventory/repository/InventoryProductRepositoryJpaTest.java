@@ -3,6 +3,8 @@ package com.distribuidos.inventory.repository;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.distribuidos.inventory.model.InventoryProduct;
+import jakarta.persistence.LockModeType;
+import java.lang.reflect.Method;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
@@ -14,6 +16,8 @@ import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
+import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Propagation;
@@ -61,6 +65,28 @@ class InventoryProductRepositoryJpaTest {
     assertThat(repository.releaseAtomically(code, 5)).isZero();
     assertRow(code, 50, 0, 0);
     assertThat(repository.findByProductCode(code).orElseThrow().getStock()).isEqualTo(50);
+  }
+
+  @Test
+  void forUpdateLookupUsesPessimisticWriteLock() throws NoSuchMethodException {
+    Method method =
+        InventoryProductRepository.class.getDeclaredMethod(
+            "findByProductCodeForUpdate", String.class);
+    Lock lock = method.getAnnotation(Lock.class);
+
+    assertThat(lock).isNotNull();
+    assertThat(lock.value()).isEqualTo(LockModeType.PESSIMISTIC_WRITE);
+  }
+
+  @Test
+  void reserveBulkUpdateFlushesBeforeExecuting() throws NoSuchMethodException {
+    Method method =
+        InventoryProductRepository.class.getDeclaredMethod(
+            "reserveAtomically", String.class, int.class);
+    Modifying modifying = method.getAnnotation(Modifying.class);
+
+    assertThat(modifying).isNotNull();
+    assertThat(modifying.flushAutomatically()).isTrue();
   }
 
   @Test
