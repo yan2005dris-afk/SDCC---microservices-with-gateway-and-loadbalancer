@@ -23,10 +23,12 @@
 | B4-10 Durabilidad | PASS | ✅ **PASS** (sin regresiones) | — | ya estaba |
 | B4-11 Idempotencia real (opción A) | — | ✅ **PASS** | — | **sí** |
 | B4-12 ITs con Postgres en CI | — | ✅ **PASS** | — | **sí** |
+| B4-13 Observabilidad y alineación del plan | — | ✅ **PASS** (verificada el 2026-11-24 13:50) | — | **sí** |
 
-**Veredicto global del bloque: ✅ PASS — las 12 ODDs en PASS limpio.**
+**Veredicto global del bloque: ✅ PASS — las 13 ODDs en PASS limpio.**
 B4-06 se completó después de esta primera pasada (ver §5): se escribieron y verificaron los 5 escenarios de
-integración que faltaban, y pasó de WARN a PASS.
+integración que faltaban, y pasó de WARN a PASS. B4-13 (ver §8) cerró los 5 ítems del checklist de B4 que
+nunca llegaron a ODD.
 
 ---
 
@@ -63,19 +65,22 @@ descuento → dos peticiones idénticas descontarían dos veces). Está muerto: 
 
 ```bash
 cd src
-JAVA_HOME=/usr/lib/jvm/java-21-openjdk mvn verify                              # BUILD SUCCESS (reactor completo, 127 tests)
-JAVA_HOME=/usr/lib/jvm/java-21-openjdk mvn -pl inventory-service verify        # BUILD SUCCESS (41 unit/slice + 10 IT)
+JAVA_HOME=/usr/lib/jvm/java-21-openjdk mvn verify                              # BUILD SUCCESS (reactor completo, 142 tests)
+JAVA_HOME=/usr/lib/jvm/java-21-openjdk mvn -pl inventory-service verify        # BUILD SUCCESS (52 unit/slice + 14 IT)
 JAVA_HOME=/usr/lib/jvm/java-21-openjdk mvn -pl inventory-service spotless:check
 ```
 
 | Alcance | Tests | Fallos | Omitidos |
 |---|---:|---:|---:|
-| `inventory-service` unit + slice JPA | 41 | 0 | 0 |
-| `inventory-service` IT con **Postgres 15 real** | 10 | 0 | 0 |
+| `inventory-service` unit + slice JPA | 52 | 0 | 0 |
+| `inventory-service` IT con **Postgres 15 real** | 14 | 0 | 0 |
 | `order-service` unit | 63 | 0 | 0 |
 | `order-service` IT (Postgres real) | 6 | 0 | 0 |
 | `api-gateway` | 7 | 0 | 0 |
-| **Total reactor (`mvn verify`)** | **127** | **0** | **0** |
+| **Total reactor (`mvn verify`)** | **142** | **0** | **0** |
+
+> Cifras de la corrida posterior a B4-13 (2026-11-24 13:45). En la primera pasada del bloque eran 127
+> tests (41 unit/slice + 10 IT en `inventory-service`).
 
 ---
 
@@ -154,3 +159,56 @@ con foco en los puntos de riesgo del rework B4-11/B4-07:
 - **Cobertura real (no mock) de la concurrencia:** aunque B4-02 se apoyaba en tests con mocks, hoy la
   tienen tanto el slice JPA en H2 (`twentyConcurrentReservesSerializeWithoutOptimisticLockErrors`) como
   el IT contra Postgres 15 (`twentyConcurrentReservesForSameOrderProductReturnOkAndDecrementOnce`).
+
+## 8. B4-13 — Observabilidad y alineación del plan (✅ PASS)
+
+B4-13 cerró los **5 ítems del checklist de B4** en `docs/plan/PLAN_IMPLEMENTACION.md` que nunca llegaron a
+ODD ni a tarea de ninguna ODD del bloque, más la trazabilidad (INV-01…INV-06) en el plan y en
+`TAREAS_PENDIENTES.md`. Verificada el 2026-11-24 13:50 contra **Postgres 15 real**.
+
+### Comportamientos verificados por ejecución
+
+| Comportamiento | Cómo se comprobó | Evidencia |
+|---|---|---|
+| `X-Instance-Id` en **todas** las respuestas | MockMvc (ruta con mapping, ruta 404) | cabecera presente, empieza por `inventory-service` |
+| `X-Correlation-Id` devuelto y propagado | MockMvc con cabecera entrante `trace-abc` | respuesta con `trace-abc` |
+| `cid` entrante reused, no regenerado | unit test del filtro | MDC = `trace-123` durante la petición |
+| `cid` generado si no llega | unit test del filtro | cabecera no vacía |
+| MDC limpio al terminar | unit test del filtro (incluido camino de error) | `MDC.get(...) == null` después de la petición |
+| Log `result=OK` con `remaining` | `ListAppender` de logback | `stock.reserve code=PROD-001 qty=5 order=ORD-001 result=OK remaining=45` |
+| Log `result=INSUFFICIENT` sin traza | `ListAppender` de logback | `… result=INSUFFICIENT remaining=2`, `throwableProxy == null` |
+| `logging.pattern.level` con `cid`/`inst` | arranque real de la app | `ERROR [cid=42634adf-… inst=inventory-service:8082] …` |
+| Sin warning de Hibernate por `open-in-view` | arranque real + IT | `spring.jpa.open-in-view is enabled by default` **no aparece** en la salida |
+| `open-in-view: false` activo | IT | `Environment.getProperty("spring.jpa.open-in-view") == "false"` |
+| El GET sigue serializando sin sesión abierta | IT contra Postgres real | 200 con `productCode`, `stock`, `reservedStock` |
+| `idx_stock_movement_product_code` existe | IT contra Postgres real | `pg_indexes.indexdef` con `product_code` y sin `UNIQUE` |
+| Contención con stock 5 | IT, 20 hilos reales | **5 × 200**, **15 × 400**, stock 0, reservado 5, **5** movimientos `RESERVATION` |
+
+### Batería de mutaciones dirigida (10/10 mueren)
+
+Cada mutación se aplicó al código real, se ejecutó el test objetivo, y se restauró el archivo. Se verificó
+además que **ningún mutante murió por error de compilación** (todos por aserción): un "test rojo" por un
+problema de compilación no demuestra cobertura.
+
+| # | Mutación | Test que la detecta | Resultado |
+|---|---|---|---|
+| M1 | el filtro no pone `X-Instance-Id` | `CorrelationIdFilterTest` + `InventoryControllerTest` | 💀 murió |
+| M2 | el filtro no limpia el MDC | `CorrelationIdFilterTest` | 💀 murió |
+| M3 | el filtro ignora el `X-Correlation-Id` entrante | `CorrelationIdFilterTest` + `InventoryControllerTest` | 💀 murió |
+| M4 | el filtro no pone `X-Correlation-Id` | `CorrelationIdFilterTest` + `InventoryControllerTest` | 💀 murió |
+| M5 | el log dice `result=RESERVED` | `InventoryReservationLoggingTest` | 💀 murió |
+| M6 | el log omite `remaining=` | `InventoryReservationLoggingTest` | 💀 murió |
+| M7 | el log dice `OK` en vez de `INSUFFICIENT` | `InventoryReservationLoggingTest` | 💀 murió |
+| M8 | el esquema de test no crea el índice | IT `schemaHasIndexOnStockMovementProductCode` | 💀 murió |
+| M9 | `open-in-view` vuelve a `true` | IT `jpaOpenInViewIsDisabled` | 💀 murió |
+| M10 | la reserva permite sobreventa (se quita `stock >= :qty`) | IT `twentyConcurrentReservesWithScarceStock…` | 💀 murió |
+
+### Desviaciones
+
+- **Un filtro en vez de dos:** el plan pedía `InstanceIdHeaderFilter` + `CorrelationIdFilter`; se implementó
+  **un** `CorrelationIdFilter` que pone ambas cabeceras (mismo patrón que `order-service`). El requisito de
+  fondo —"un filtro en todas las respuestas, no en cada método"— se cumple mejor así. Anotado en el plan.
+- **`@Import(InstanceIdentity.class)` en `InventoryControllerTest`:** el `@WebMvcTest` carga el filtro y
+  necesita su bean; es el mismo apaño de `OrderControllerTest`. Ninguna aserción previa se modificó.
+- **Verificación manual de P02** sigue pendiente (es una corrida de P02, de B7/B9): en el plan queda como el
+  único checkbox de B4 sin marcar y **no** se marcó como hecho.
