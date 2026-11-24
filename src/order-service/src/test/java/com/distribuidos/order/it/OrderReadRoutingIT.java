@@ -4,6 +4,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
+import com.distribuidos.order.datasource.ReplicaDataSources;
+import com.distribuidos.order.datasource.health.ReplicaProbe;
+import com.distribuidos.order.datasource.health.ReplicaStatus;
 import com.distribuidos.order.dto.OrderResponse;
 import com.distribuidos.order.loadbalancer.InventoryStockClient;
 import com.distribuidos.order.loadbalancer.dto.InventoryReserveResponse;
@@ -21,8 +24,12 @@ import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestMethodOrder;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.test.web.client.TestRestTemplate;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Primary;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
@@ -43,6 +50,10 @@ import org.testcontainers.junit.jupiter.Testcontainers;
  * el nombre del nodo. Así el test comprueba <b>qué base respondió</b>, no solo la cabecera. No hace
  * falta replicación WAL real: lo que se prueba es el enrutamiento y el failover con transacciones
  * reales, que es lo que los tests con mocks no podían detectar.
+ *
+ * <p>Como los contenedores no replican, el sondeo de aptitud real los marcaría {@code LAGGING}.
+ * Aquí se sustituye por un sondeo de conectividad: este test prueba el enrutamiento, y {@code
+ * PostgresReplicaProbeIT} y el smoke test de Compose prueban la aptitud con replicación real.
  */
 @Testcontainers
 @SpringBootTest(
@@ -200,5 +211,22 @@ class OrderReadRoutingIT {
 
   private static Connection open(PostgreSQLContainer<?> node) throws SQLException {
     return DriverManager.getConnection(node.getJdbcUrl(), DB_USER, DB_PASSWORD);
+  }
+
+  /** Sondeo de conectividad: {@code UP} si la réplica acepta conexiones. */
+  @TestConfiguration
+  static class ConnectivityProbeConfig {
+
+    @Bean
+    @Primary
+    ReplicaProbe connectivityProbe(@Qualifier("replicaDataSources") ReplicaDataSources pools) {
+      return node -> {
+        try (Connection connection = pools.asMap().get(node).getConnection()) {
+          return connection.isValid(1) ? ReplicaStatus.up(0) : ReplicaStatus.down("invalid");
+        } catch (SQLException ex) {
+          return ReplicaStatus.down("unreachable");
+        }
+      };
+    }
   }
 }

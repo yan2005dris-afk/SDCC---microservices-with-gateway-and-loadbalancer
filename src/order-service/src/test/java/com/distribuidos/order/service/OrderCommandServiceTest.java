@@ -8,7 +8,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.distribuidos.order.datasource.DataSourceType;
+import com.distribuidos.order.datasource.DbNode;
 import com.distribuidos.order.datasource.RoutingContextHolder;
 import com.distribuidos.order.dto.CreateOrderRequest;
 import com.distribuidos.order.dto.OrderResponse;
@@ -48,7 +48,7 @@ class OrderCommandServiceTest {
   void createsConfirmedOrderOnPrimaryWhenStockIsAvailable() {
     when(inventoryStockClient.reserveStock(any()))
         .thenReturn(new InventoryReserveResponse("PROD-001", true, 48, null));
-    AtomicReference<DataSourceType> nodeDuringSave = new AtomicReference<>();
+    AtomicReference<DbNode> nodeDuringSave = new AtomicReference<>();
     when(orderRepository.save(any(Order.class)))
         .thenAnswer(
             invocation -> {
@@ -62,7 +62,7 @@ class OrderCommandServiceTest {
     assertThat(created.totalAmount()).isEqualByComparingTo("3799.98");
     assertThat(created.orderNumber()).startsWith("ORD-");
     assertThat(created.items()).hasSize(1);
-    assertThat(nodeDuringSave.get()).isEqualTo(DataSourceType.PRIMARY);
+    assertThat(nodeDuringSave.get()).isEqualTo(DbNode.PRIMARY);
     assertThat(RoutingContextHolder.get()).isNull();
   }
 

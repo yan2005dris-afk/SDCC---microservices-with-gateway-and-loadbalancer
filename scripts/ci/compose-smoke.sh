@@ -75,4 +75,20 @@ for expected in REPLICA_1 REPLICA_2; do
     || fail "ninguna lectura servida por $expected"
 done
 
+echo "5) Aptitud de las réplicas según order-service (ORD-02)"
+# Sondeo cada 2 s y rejoin-threshold 2: tras el arranque, ambas réplicas deben quedar UP
+# (en recuperación + streaming + lag bajo) y en rotación.
+ORDER_URL="${ORDER_URL:-http://localhost:8081}"
+for attempt in $(seq 1 15); do
+  health=$(curl -fs "$ORDER_URL/actuator/health" || true)
+  ok=1
+  for replica in REPLICA_1 REPLICA_2; do
+    echo "$health" | grep -qE "\"$replica\":\{\"inRotation\":true,\"state\":\"UP\"" || ok=0
+  done
+  [ "$ok" -eq 1 ] && break
+  [ "$attempt" -eq 15 ] && fail "las réplicas no figuran UP y en rotación: $health"
+  sleep 2
+done
+for replica in REPLICA_1 REPLICA_2; do pass "$replica UP (streaming) y en rotación"; done
+
 echo "Smoke test superado."

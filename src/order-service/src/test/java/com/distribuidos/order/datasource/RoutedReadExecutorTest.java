@@ -9,17 +9,15 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.distribuidos.order.datasource.health.ReplicaHealthRegistry;
 import com.distribuidos.order.observability.MdcKeys;
 import java.sql.SQLException;
 import java.sql.SQLTransientConnectionException;
 import java.time.Duration;
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.function.Supplier;
-import javax.sql.DataSource;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -33,18 +31,20 @@ import org.springframework.transaction.support.SimpleTransactionStatus;
 
 class RoutedReadExecutorTest {
 
+  private static final DbNode REPLICA_1 = new DbNode("REPLICA_1");
+  private static final DbNode REPLICA_2 = new DbNode("REPLICA_2");
+
   private PlatformTransactionManager transactionManager;
-  private RoundRobinReplicaSelector selector;
-  private List<DataSourceType> nodesSeen;
+  private ReplicaHealthRegistry registry;
+  private HealthAwareReplicaSelector selector;
+  private List<DbNode> nodesSeen;
 
   @BeforeEach
   void setUp() {
     transactionManager = mock(PlatformTransactionManager.class);
     when(transactionManager.getTransaction(any())).thenReturn(new SimpleTransactionStatus());
-    Map<DataSourceType, DataSource> replicas = new LinkedHashMap<>();
-    replicas.put(DataSourceType.REPLICA_1, mock(DataSource.class));
-    replicas.put(DataSourceType.REPLICA_2, mock(DataSource.class));
-    selector = new RoundRobinReplicaSelector(replicas);
+    registry = new ReplicaHealthRegistry(List.of(REPLICA_1, REPLICA_2), 2);
+    selector = new HealthAwareReplicaSelector(registry);
     nodesSeen = new ArrayList<>();
   }
 
@@ -60,9 +60,9 @@ class RoutedReadExecutorTest {
   }
 
   /** Consulta que registra el nodo fijado y falla por conexión en los nodos indicados. */
-  private Supplier<String> query(Set<DataSourceType> failingNodes) {
+  private Supplier<String> query(Set<DbNode> failingNodes) {
     return () -> {
-      DataSourceType node = RoutingContextHolder.get();
+      DbNode node = RoutingContextHolder.get();
       nodesSeen.add(node);
       assertThat(MDC.get(MdcKeys.DB_NODE)).isEqualTo(node.name());
       if (failingNodes.contains(node)) {
@@ -77,7 +77,7 @@ class RoutedReadExecutorTest {
   void ordinaryReadUsesSelectedReplica() {
     RoutedResult<String> result = executor(true).execute(ReadPolicy.ORDINARY, query(Set.of()));
 
-    assertThat(result.node()).isEqualTo(DataSourceType.REPLICA_1);
+    assertThat(result.node()).isEqualTo(REPLICA_1);
     assertThat(result.value()).isEqualTo("data-from-REPLICA_1");
     assertThat(result.attempts()).isEqualTo(1);
   }
@@ -85,17 +85,17 @@ class RoutedReadExecutorTest {
   @Test
   void connectionFailureMarksReplicaDownAndRetriesOnNextReplica() {
     RoutedResult<String> result =
-        executor(true).execute(ReadPolicy.ORDINARY, query(Set.of(DataSourceType.REPLICA_1)));
+        executor(true).execute(ReadPolicy.ORDINARY, query(Set.of(REPLICA_1)));
 
-    assertThat(result.node()).isEqualTo(DataSourceType.REPLICA_2);
+    assertThat(result.node()).isEqualTo(REPLICA_2);
     assertThat(result.attempts()).isEqualTo(2);
-    assertThat(nodesSeen).containsExactly(DataSourceType.REPLICA_1, DataSourceType.REPLICA_2);
-    assertThat(selector.isHealthy(DataSourceType.REPLICA_1)).isFalse();
+    assertThat(nodesSeen).containsExactly(REPLICA_1, REPLICA_2);
+    assertThat(registry.isInRotation(REPLICA_1)).isFalse();
   }
 
   @Test
   void eachAttemptRunsInItsOwnReadOnlyTransaction() {
-    executor(true).execute(ReadPolicy.ORDINARY, query(Set.of(DataSourceType.REPLICA_1)));
+    executor(true).execute(ReadPolicy.ORDINARY, query(Set.of(REPLICA_1)));
 
     ArgumentCaptor<TransactionDefinition> definitions =
         ArgumentCaptor.forClass(TransactionDefinition.class);
@@ -119,30 +119,23 @@ class RoutedReadExecutorTest {
 
     assertThatThrownBy(() -> executor(true).execute(ReadPolicy.ORDINARY, badQuery))
         .isInstanceOf(InvalidDataAccessResourceUsageException.class);
-    assertThat(nodesSeen).containsExactly(DataSourceType.REPLICA_1);
-    assertThat(selector.isHealthy(DataSourceType.REPLICA_1)).isTrue();
+    assertThat(nodesSeen).containsExactly(REPLICA_1);
+    assertThat(registry.isInRotation(REPLICA_1)).isTrue();
   }
 
   @Test
   void allReplicasDownFallsBackToPrimary() {
     RoutedResult<String> result =
-        executor(true)
-            .execute(
-                ReadPolicy.ORDINARY,
-                query(Set.of(DataSourceType.REPLICA_1, DataSourceType.REPLICA_2)));
+        executor(true).execute(ReadPolicy.ORDINARY, query(Set.of(REPLICA_1, REPLICA_2)));
 
-    assertThat(result.node()).isEqualTo(DataSourceType.PRIMARY);
+    assertThat(result.node()).isEqualTo(DbNode.PRIMARY);
     assertThat(result.attempts()).isEqualTo(3);
   }
 
   @Test
   void allReplicasDownWithoutFallbackIsUnavailable() {
     assertThatThrownBy(
-            () ->
-                executor(false)
-                    .execute(
-                        ReadPolicy.ORDINARY,
-                        query(Set.of(DataSourceType.REPLICA_1, DataSourceType.REPLICA_2))))
+            () -> executor(false).execute(ReadPolicy.ORDINARY, query(Set.of(REPLICA_1, REPLICA_2))))
         .isInstanceOf(ReadNodesUnavailableException.class);
   }
 
@@ -150,21 +143,20 @@ class RoutedReadExecutorTest {
   void criticalReadGoesStraightToPrimary() {
     RoutedResult<String> result = executor(true).execute(ReadPolicy.CRITICAL, query(Set.of()));
 
-    assertThat(result.node()).isEqualTo(DataSourceType.PRIMARY);
-    assertThat(nodesSeen).containsExactly(DataSourceType.PRIMARY);
+    assertThat(result.node()).isEqualTo(DbNode.PRIMARY);
+    assertThat(nodesSeen).containsExactly(DbNode.PRIMARY);
   }
 
   @Test
   void primaryConnectionFailureIsReportedAsUnavailable() {
     assertThatThrownBy(
-            () ->
-                executor(true).execute(ReadPolicy.CRITICAL, query(Set.of(DataSourceType.PRIMARY))))
+            () -> executor(true).execute(ReadPolicy.CRITICAL, query(Set.of(DbNode.PRIMARY))))
         .isInstanceOf(ReadNodesUnavailableException.class);
   }
 
   @Test
   void routingContextAndMdcAreClearedAfterSuccessAndFailure() {
-    executor(true).execute(ReadPolicy.ORDINARY, query(Set.of(DataSourceType.REPLICA_1)));
+    executor(true).execute(ReadPolicy.ORDINARY, query(Set.of(REPLICA_1)));
 
     assertThat(RoutingContextHolder.get()).isNull();
     assertThat(MDC.get(MdcKeys.DB_NODE)).isNull();
@@ -179,11 +171,11 @@ class RoutedReadExecutorTest {
     doThrow(rollbackOnClosedConnection()).when(transactionManager).rollback(any());
 
     RoutedResult<String> result =
-        executor(true).execute(ReadPolicy.ORDINARY, query(Set.of(DataSourceType.REPLICA_1)));
+        executor(true).execute(ReadPolicy.ORDINARY, query(Set.of(REPLICA_1)));
 
-    assertThat(result.node()).isEqualTo(DataSourceType.REPLICA_2);
-    assertThat(nodesSeen).containsExactly(DataSourceType.REPLICA_1, DataSourceType.REPLICA_2);
-    assertThat(selector.isHealthy(DataSourceType.REPLICA_1)).isFalse();
+    assertThat(result.node()).isEqualTo(REPLICA_2);
+    assertThat(nodesSeen).containsExactly(REPLICA_1, REPLICA_2);
+    assertThat(registry.isInRotation(REPLICA_1)).isFalse();
   }
 
   @Test
@@ -199,7 +191,7 @@ class RoutedReadExecutorTest {
         .isInstanceOf(InvalidDataAccessResourceUsageException.class)
         .satisfies(
             ex -> assertThat(ex.getSuppressed()).hasOnlyElementsOfType(JpaSystemException.class));
-    assertThat(nodesSeen).containsExactly(DataSourceType.REPLICA_1);
+    assertThat(nodesSeen).containsExactly(REPLICA_1);
   }
 
   private static JpaSystemException rollbackOnClosedConnection() {

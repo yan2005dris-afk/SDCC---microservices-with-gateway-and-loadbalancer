@@ -8,4 +8,4 @@ package com.distribuidos.order.datasource;
  * @param attempts número de intentos necesarios (1 si no hubo failover).
  * @param <T> tipo del valor.
  */
-public record RoutedResult<T>(T value, DataSourceType node, int attempts) {}
+public record RoutedResult<T>(T value, DbNode node, int attempts) {}

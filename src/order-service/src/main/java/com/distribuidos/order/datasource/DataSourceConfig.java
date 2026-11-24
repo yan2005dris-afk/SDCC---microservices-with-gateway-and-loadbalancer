@@ -1,12 +1,12 @@
 package com.distribuidos.order.datasource;
 
+import com.distribuidos.order.datasource.health.ReplicaHealthProperties;
 import com.zaxxer.hikari.HikariDataSource;
 import java.time.Duration;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import javax.sql.DataSource;
 import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -14,49 +14,35 @@ import org.springframework.context.annotation.Primary;
 import org.springframework.jdbc.datasource.LazyConnectionDataSourceProxy;
 
 /**
- * Pools de conexión del primario y de las réplicas, y {@link DataSource} enrutado que usa JPA.
+ * Pools de conexión del primario y de las réplicas declaradas en {@code sdcc.datasource}, y {@link
+ * DataSource} enrutado que usa JPA.
  *
  * <p>Las réplicas usan tiempos de espera cortos porque, si una falla, hay otra disponible. El
  * primario, que es el último recurso, espera más.
  */
 @Configuration
-@EnableConfigurationProperties(ReadRoutingProperties.class)
+@EnableConfigurationProperties({
+  RoutingDataSourceProperties.class,
+  ReadRoutingProperties.class,
+  ReplicaHealthProperties.class
+})
 public class DataSourceConfig {
 
-  private static final int MAX_POOL_SIZE = 10;
   private static final long MIN_VALIDATION_TIMEOUT_MS = 250;
   private static final long MAX_VALIDATION_TIMEOUT_MS = 2000;
 
-  private final String primaryUrl;
-  private final String replica1Url;
-  private final String replica2Url;
-  private final String dbUser;
-  private final String dbPassword;
-  private final ReadRoutingProperties properties;
+  private final RoutingDataSourceProperties nodes;
+  private final ReadRoutingProperties timeouts;
 
   /**
-   * Crea la configuración a partir de las variables de entorno existentes.
+   * Crea la configuración.
    *
-   * @param primaryUrl URL JDBC del primario.
-   * @param replica1Url URL JDBC de la réplica 1.
-   * @param replica2Url URL JDBC de la réplica 2.
-   * @param dbUser usuario de base de datos.
-   * @param dbPassword contraseña de base de datos.
-   * @param properties tiempos de espera y política de lectura.
+   * @param nodes primario, réplicas y credenciales.
+   * @param timeouts tiempos de espera y política de lectura.
    */
-  public DataSourceConfig(
-      @Value("${DB_PRIMARY_URL:jdbc:postgresql://localhost:5435/orders_db}") String primaryUrl,
-      @Value("${DB_REPLICA1_URL:jdbc:postgresql://localhost:5433/orders_db}") String replica1Url,
-      @Value("${DB_REPLICA2_URL:jdbc:postgresql://localhost:5434/orders_db}") String replica2Url,
-      @Value("${DB_USER:admin}") String dbUser,
-      @Value("${DB_PASSWORD:admin_demo_change_me}") String dbPassword,
-      ReadRoutingProperties properties) {
-    this.primaryUrl = primaryUrl;
-    this.replica1Url = replica1Url;
-    this.replica2Url = replica2Url;
-    this.dbUser = dbUser;
-    this.dbPassword = dbPassword;
-    this.properties = properties;
+  public DataSourceConfig(RoutingDataSourceProperties nodes, ReadRoutingProperties timeouts) {
+    this.nodes = nodes;
+    this.timeouts = timeouts;
   }
 
   /**
@@ -65,53 +51,57 @@ public class DataSourceConfig {
    * @return pool del primario.
    */
   @Bean
-  public DataSource primaryDataSource() {
-    return createPool(primaryUrl, "HikariPrimaryPool", properties.primaryConnectionTimeout(), null);
-  }
-
-  /**
-   * Pool de la réplica 1.
-   *
-   * @return pool de la réplica 1.
-   */
-  @Bean
-  public DataSource replica1DataSource() {
+  public HikariDataSource primaryDataSource() {
     return createPool(
-        replica1Url,
-        "HikariReplica1Pool",
-        properties.replicaConnectionTimeout(),
-        properties.replicaSocketTimeout());
+        nodes.primary().url(),
+        "HikariPrimaryPool",
+        nodes.poolMaxSize(),
+        timeouts.primaryConnectionTimeout(),
+        null);
   }
 
   /**
-   * Pool de la réplica 2.
+   * Pools de tráfico de cada réplica, en orden de reparto.
    *
-   * @return pool de la réplica 2.
+   * @return pools de réplicas; se cierran al apagar la aplicación.
    */
   @Bean
-  public DataSource replica2DataSource() {
-    return createPool(
-        replica2Url,
-        "HikariReplica2Pool",
-        properties.replicaConnectionTimeout(),
-        properties.replicaSocketTimeout());
+  public ReplicaDataSources replicaDataSources() {
+    Map<DbNode, DataSource> pools = new LinkedHashMap<>();
+    for (RoutingDataSourceProperties.Replica replica : nodes.replicas()) {
+      pools.put(
+          replica.node(),
+          createPool(
+              replica.url(),
+              "Hikari" + replica.name() + "Pool",
+              nodes.poolMaxSize(),
+              timeouts.replicaConnectionTimeout(),
+              timeouts.replicaSocketTimeout()));
+    }
+    return new ReplicaDataSources(pools);
   }
 
   /**
-   * Selector Round-Robin sobre las réplicas, en orden de reparto.
+   * Pools exclusivos del sondeo de salud: 1 conexión por réplica, separada del tráfico, para que un
+   * pool de tráfico agotado no se confunda con una réplica caída.
    *
-   * @param replica1 pool de la réplica 1.
-   * @param replica2 pool de la réplica 2.
-   * @return selector de réplicas.
+   * @param health configuración del sondeo.
+   * @return pools de sondeo; se cierran al apagar la aplicación.
    */
   @Bean
-  public RoundRobinReplicaSelector replicaSelector(
-      @Qualifier("replica1DataSource") DataSource replica1,
-      @Qualifier("replica2DataSource") DataSource replica2) {
-    Map<DataSourceType, DataSource> replicas = new LinkedHashMap<>();
-    replicas.put(DataSourceType.REPLICA_1, replica1);
-    replicas.put(DataSourceType.REPLICA_2, replica2);
-    return new RoundRobinReplicaSelector(replicas);
+  public ReplicaDataSources replicaProbeDataSources(ReplicaHealthProperties health) {
+    Map<DbNode, DataSource> pools = new LinkedHashMap<>();
+    for (RoutingDataSourceProperties.Replica replica : nodes.replicas()) {
+      pools.put(
+          replica.node(),
+          createPool(
+              replica.url(),
+              "HikariProbe" + replica.name() + "Pool",
+              1,
+              health.probeTimeout(),
+              health.probeTimeout()));
+    }
+    return new ReplicaDataSources(pools);
   }
 
   /**
@@ -122,20 +112,17 @@ public class DataSourceConfig {
    * RoutingContextHolder}.
    *
    * @param primary pool del primario.
-   * @param replica1 pool de la réplica 1.
-   * @param replica2 pool de la réplica 2.
+   * @param replicas pools de tráfico de las réplicas.
    * @return {@link DataSource} enrutado.
    */
   @Bean
   @Primary
   public DataSource routingDataSource(
       @Qualifier("primaryDataSource") DataSource primary,
-      @Qualifier("replica1DataSource") DataSource replica1,
-      @Qualifier("replica2DataSource") DataSource replica2) {
+      @Qualifier("replicaDataSources") ReplicaDataSources replicas) {
     Map<Object, Object> targets = new LinkedHashMap<>();
-    targets.put(DataSourceType.PRIMARY, primary);
-    targets.put(DataSourceType.REPLICA_1, replica1);
-    targets.put(DataSourceType.REPLICA_2, replica2);
+    targets.put(DbNode.PRIMARY, primary);
+    targets.putAll(replicas.asMap());
 
     DynamicRoutingDataSource routing = new DynamicRoutingDataSource();
     routing.setTargetDataSources(targets);
@@ -145,14 +132,18 @@ public class DataSourceConfig {
   }
 
   private HikariDataSource createPool(
-      String url, String poolName, Duration connectionTimeout, Duration socketTimeout) {
+      String url,
+      String poolName,
+      int maxPoolSize,
+      Duration connectionTimeout,
+      Duration socketTimeout) {
     HikariDataSource ds = new HikariDataSource();
     ds.setJdbcUrl(url);
-    ds.setUsername(dbUser);
-    ds.setPassword(dbPassword);
+    ds.setUsername(nodes.username());
+    ds.setPassword(nodes.password());
     ds.setDriverClassName("org.postgresql.Driver");
     ds.setPoolName(poolName);
-    ds.setMaximumPoolSize(MAX_POOL_SIZE);
+    ds.setMaximumPoolSize(maxPoolSize);
     ds.setConnectionTimeout(connectionTimeout.toMillis());
     // Hikari exige validationTimeout < connectionTimeout.
     ds.setValidationTimeout(

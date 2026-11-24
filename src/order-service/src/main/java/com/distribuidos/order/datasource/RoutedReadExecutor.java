@@ -72,12 +72,12 @@ public class RoutedReadExecutor {
     RuntimeException lastFailure = null;
     int attempt = 0;
     while (attempt < selector.replicaCount()) {
-      Optional<DataSourceType> candidate = selector.next();
+      Optional<DbNode> candidate = selector.next();
       if (candidate.isEmpty()) {
         break;
       }
       attempt++;
-      DataSourceType replica = candidate.get();
+      DbNode replica = candidate.get();
       try {
         return runOn(replica, policy, query, attempt);
       } catch (RuntimeException ex) {
@@ -97,7 +97,7 @@ public class RoutedReadExecutor {
 
   private <T> RoutedResult<T> runOnPrimary(ReadPolicy policy, Supplier<T> query, int attempt) {
     try {
-      return runOn(DataSourceType.PRIMARY, policy, query, attempt);
+      return runOn(DbNode.PRIMARY, policy, query, attempt);
     } catch (RuntimeException ex) {
       if (TransientConnectionFailures.isTransient(ex)) {
         throw new ReadNodesUnavailableException(ex);
@@ -107,7 +107,7 @@ public class RoutedReadExecutor {
   }
 
   private <T> RoutedResult<T> runOn(
-      DataSourceType node, ReadPolicy policy, Supplier<T> query, int attempt) {
+      DbNode node, ReadPolicy policy, Supplier<T> query, int attempt) {
     long start = System.nanoTime();
     RoutingContextHolder.set(node);
     MDC.put(MdcKeys.DB_NODE, node.name());

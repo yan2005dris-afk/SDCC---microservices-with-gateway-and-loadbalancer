@@ -341,69 +341,77 @@ Todo es configurable en `ReadRoutingProperties` (`@ConfigurationProperties("sdcc
 
 ## B3 · `feature/order-replica-readiness`
 
-**Tareas:** ORD-02, ORD-05, cabecera `X-Replication-Lag-Ms` · **Base:** `develop` con B2 · **Afecta:** P06, P08
+**Tareas:** ORD-02, ORD-05, cabecera `X-Replication-Lag-Ms`, N réplicas configurables · **Base:** `develop` con B2 · **Afecta:** P06, P08
+
+> **Estado:** ✅ implementado y verificado (sin commit). `mvn verify`: 63 tests unitarios + 6 de integración (`OrderReadRoutingIT`, `PostgresReplicaProbeIT`); smoke test de Compose con la verificación de aptitud en verde. En el clúster: P06 sin tráfico → `to=DOWN` 0,3 s después del `docker stop`, y las lecturas siguientes van directo a `REPLICA_2` (~35 ms, sin reintento); P08 → `to=UP` con `lagMs=0` y `action=JOIN` tras 2 sondeos.
 
 ### Objetivo
-Que el estado de cada réplica lo determine un health check periódico de todas las réplicas, y que una réplica solo vuelva al balanceo cuando está en recuperación, replicando y con un lag aceptable. El código debe soportar N réplicas.
+Que el estado de cada réplica lo determine un sondeo periódico de **todas** las réplicas (ORD-05), y que una réplica solo vuelva al balanceo cuando está en recuperación, replicando y con un lag aceptable (ORD-02). Las réplicas se declaran en configuración (N réplicas).
+
+### Punto de partida (después de B2)
+| Ya existe | B3 |
+|---|---|
+| Interfaz `ReplicaSelector` + `RoundRobinReplicaSelector` | Se mantiene la interfaz; `HealthAwareReplicaSelector` reemplaza la implementación |
+| `markDown()` al fallar una petición | Se mantiene como detección inmediata; escribe en el mismo registro |
+| `@Scheduled` que solo revisa réplicas caídas con `isValid()` | `ReplicaHealthMonitor` sondea todas con la consulta de aptitud |
+| Enum `DataSourceType` y beans `replica1DataSource`/`replica2DataSource` fijos | `DbNode` (record) + lista `sdcc.datasource.replicas` |
+| `/actuator/health` pasa a `DOWN` si cae una réplica (indicador `db`) | Indicador propio: `UP` + `degraded` mientras el primario responda |
 
 ### Diseño
-
 ```
-datasource/config/RoutingDataSourceProperties   ← @ConfigurationProperties("sdcc.datasource")
-     primary: {url}
-     replicas: [{name: REPLICA_1, url}, {name: REPLICA_2, url}, ...]
-     health: {interval: 5s, max-lag: 5s, rejoin-threshold: 2, probe-timeout: 2s}
-
-datasource/health/ReplicaHealthProbe            ← interfaz: probe(DataSource) → ReplicaStatus
-     └── PostgresReplicaHealthProbe             ← SQL de abajo
-datasource/health/ReplicaHealthRegistry         ← estado por réplica: UP | LAGGING | DOWN (+ lagMs, lastCheck)
-datasource/health/ReplicaHealthScheduler        ← @Scheduled: sondea TODAS las réplicas
-datasource/HealthAwareRoundRobinSelector        ← implements ReplicaSelector; rota solo entre las UP
-actuator/ReplicasHealthIndicator                ← detalle por réplica en /actuator/health
+datasource/
+  DbNode                        record(String name); DbNode.PRIMARY (reemplaza al enum)
+  RoutingDataSourceProperties   @ConfigurationProperties("sdcc.datasource"), @Validated:
+                                username, password, pool-max-size, primary.url, replicas[{name, url}]
+  ReplicaDataSources            pools de tráfico por réplica, en orden (AutoCloseable)
+  HealthAwareReplicaSelector    implements ReplicaSelector; Round-Robin solo entre réplicas en rotación
+  health/
+    ReplicaHealthProperties     sdcc.datasource.health: interval 2s, probe-timeout 1s, max-lag 5s, rejoin-threshold 2
+    ReplicaProbe                interfaz: ReplicaStatus probe(DbNode)
+    PostgresReplicaProbe        consulta de aptitud por un pool exclusivo de 1 conexión por réplica
+    ReplicaStatus / ReplicaState  UP | LAGGING | DOWN + lagMs + motivo + instante
+    ReplicaHealthRegistry       estado por réplica (ConcurrentHashMap.compute) + histéresis
+    ReplicaStatusView           vista de solo lectura (controller y actuator)
+    ReplicaHealthMonitor        SmartLifecycle + TaskScheduler: sondea todas en paralelo (hilos virtuales)
+    DatabaseNodesHealthIndicator  reemplaza al indicador `db`
 ```
 
-- **Consulta de aptitud** (se ejecuta en la réplica):
-  ```sql
-  SELECT pg_is_in_recovery()                                   AS in_recovery,
-         (SELECT status FROM pg_stat_wal_receiver)             AS receiver_status,
-         CASE WHEN pg_last_wal_receive_lsn() = pg_last_wal_replay_lsn() THEN 0
-              ELSE EXTRACT(EPOCH FROM now() - pg_last_xact_replay_timestamp()) * 1000
-         END                                                   AS lag_ms
-  ```
-  - `UP`: `in_recovery = true`, `receiver_status = 'streaming'` y `lag_ms <= max-lag`.
-  - `LAGGING`: responde, pero no cumple alguna de las condiciones. Queda fuera del balanceo.
-  - `DOWN`: no hay conexión o se agota el `probe-timeout`.
-  - El `CASE` evita un falso lag cuando el primario no recibe escrituras: en ese caso el timestamp de replay no avanza, aunque la réplica esté al día.
-- **Histéresis:** una réplica `DOWN` o `LAGGING` necesita `rejoin-threshold` sondeos `UP` consecutivos para volver al balanceo. Evita que entre y salga continuamente.
-- **Detección proactiva (ORD-05):** el scheduler sondea también las réplicas sanas. El `markDown()` de B2 se mantiene como detección inmediata ante un fallo real de una petición.
-- **Logs solo en transiciones:** `replica.state name=REPLICA_1 from=UP to=DOWN reason=connection-refused`. No se registra nada en cada sondeo para no llenar el log.
-- **`ReplicasHealthIndicator`:** **debe devolver `UP` con detalle `degraded`** mientras el primario o al menos una réplica estén disponibles. Si devolviera `DOWN` al caer una réplica, el health check del LoadBalancer del Gateway retiraría la instancia de `order-service` y una falla de BD se convertiría en una falla HTTP.
-- **`X-Replication-Lag-Ms`:** se toma del último sondeo del registro, sin consultar en cada petición. Solo se incluye cuando el nodo es una réplica.
-- **Compatibilidad:** `application.yml` mapea las variables actuales: `sdcc.datasource.replicas[0].url=${DB_REPLICA1_URL:...}`. No hace falta tocar `compose.yaml`.
-- **Permisos:** `pg_stat_wal_receiver` necesita el rol `pg_monitor` o superusuario. En la demo, el usuario `admin` es superusuario. Para producción se documenta `GRANT pg_monitor TO <app_user>;`.
+- **Pool exclusivo para el sondeo** (1 conexión por réplica): con carga alta el pool de tráfico puede agotarse y el sondeo marcaría `DOWN` una réplica sana.
+- **Sondeo en paralelo** cada 2 s con `probe-timeout` de 1 s: una réplica caída se detecta en ≤ 3 s aunque no haya tráfico (P06 pide ≤ 5 s).
+- **Histéresis asimétrica:** sale del balanceo con 1 fallo; vuelve tras `rejoin-threshold` sondeos `UP` seguidos. `markDown()` reinicia el contador.
+- **Aptitud** (`UP`): `pg_is_in_recovery()`, `pg_stat_wal_receiver.status = 'streaming'` y lag ≤ `max-lag`. El lag es 0 si `receive_lsn = replay_lsn` (evita un lag falso con el primario sin escrituras). En producción: `GRANT pg_monitor TO <app_user>;`.
+- **Health:** `management.health.db.enabled: false` y `DatabaseNodesHealthIndicator`: `UP` si el primario responde, con `degraded` y el detalle por réplica; `DOWN` solo si cae el primario. El tráfico lo sigue decidiendo readiness (ORD-09).
+- **`X-Replication-Lag-Ms`:** del último sondeo (`ReplicaStatusView`), solo cuando responde una réplica.
+- **Logs solo en transiciones:** `replica.state name=REPLICA_1 from=UP to=DOWN reason=...` y `replica.rotation name=REPLICA_1 action=JOIN|LEAVE`.
+- **Compatibilidad:** `application.yml` mapea `DB_PRIMARY_URL`, `DB_REPLICA1_URL`, `DB_REPLICA2_URL`, `DB_USER`, `DB_PASSWORD`; `compose.yaml` no cambia. `pool-max-size` (`SDCC_DB_POOL_MAX_SIZE`) acota las conexiones al escalar instancias.
+
+### Hallazgo durante la implementación
+| # | Problema | Causa | Solución |
+|---|---|---|---|
+| H4 | Con replicación real, las dos réplicas quedaban `LAGGING` (`lag-unknown`) y todas las lecturas iban al primario. Lo detectó el smoke test de Compose | Tras reiniciarse el receptor de WAL, `pg_last_wal_receive_lsn()` vuelve al inicio del segmento y queda **por detrás** de `pg_last_wal_replay_lsn()`; sin transacciones aplicadas desde el `pg_basebackup`, `pg_last_xact_replay_timestamp()` es nulo. La condición `receive = replay` nunca se cumplía | Lag 0 cuando `replay_lsn >= receive_lsn` (la réplica aplicó todo lo recibido) |
 
 ### Checklist
-- [ ] `RoutingDataSourceProperties` con validación (`@Validated`, `@NotEmpty replicas`).
-- [ ] `DataSourceConfig`: construir un pool Hikari por cada entrada de `replicas`. La clave de enrutamiento pasa de `enum` a `String` (nombre de la réplica), conservando los nombres `PRIMARY`, `REPLICA_1` y `REPLICA_2`.
-- [ ] Ajustar `RoutingContextHolder`, `RoutedResult` y los headers a la clave `String`.
-- [ ] `ReplicaHealthProbe` + `PostgresReplicaHealthProbe` (con `setQueryTimeout`).
-- [ ] `ReplicaHealthRegistry`: estado con `ConcurrentHashMap` / `AtomicReference`, seguro entre hilos.
-- [ ] `ReplicaHealthScheduler`: `@Scheduled(fixedDelayString = "${sdcc.datasource.health.interval:5s}")`.
-- [ ] `HealthAwareRoundRobinSelector` reemplaza a `RoundRobinReplicaSelector` como `@Primary` (o como único bean).
-- [ ] `ReplicasHealthIndicator` con la regla `UP`/`degraded` descrita arriba.
-- [ ] Cabecera `X-Replication-Lag-Ms`.
-- [ ] Logs de transición de estado.
+- [x] `DbNode` reemplaza a `DataSourceType` en el enrutamiento, `RoutedResult` y las cabeceras.
+- [x] `RoutingDataSourceProperties` validado + `ReplicaDataSources`; `DataSourceConfig` crea un pool por réplica.
+- [x] `ReplicaProbe` + `PostgresReplicaProbe` (pool exclusivo, `setQueryTimeout`).
+- [x] `ReplicaHealthRegistry` + `ReplicaStatusView` con histéresis, seguro entre hilos.
+- [x] `ReplicaHealthMonitor` con sondeo paralelo y ciclo de vida (`SmartLifecycle`).
+- [x] `HealthAwareReplicaSelector` reemplaza a `RoundRobinReplicaSelector`.
+- [x] `DatabaseNodesHealthIndicator` y `management.health.db.enabled: false`.
+- [x] Cabecera `X-Replication-Lag-Ms`.
+- [x] Logs de transición.
+- [x] TRD §3 y TAREAS_PENDIENTES actualizados.
 
 ### Tests
-- [ ] Unitario `HealthAwareRoundRobinSelectorTest`: rota solo entre réplicas `UP`; si no hay ninguna, devuelve `PRIMARY`; respeta la histéresis.
-- [ ] Unitario `ReplicaHealthRegistryTest`: transiciones `UP→DOWN→UP` con N sondeos y `UP→LAGGING`.
-- [ ] Unitario `ReplicasHealthIndicatorTest`: con una réplica caída → `UP` + `degraded`; con todo caído → `DOWN`.
-- [ ] Integración: ampliar `OrderReadRoutingIT`. Con la réplica 1 detenida y luego reiniciada, vuelve al balanceo después de `rejoin-threshold` sondeos. Contra un contenedor que no es réplica, `in_recovery=false` → `LAGGING`: no se reincorpora porque no está replicando.
+- [x] Unitarios: registro (transiciones e histéresis), selector, clasificación de aptitud, monitor, indicador de health, cabecera.
+- [x] `OrderReadRoutingIT` sin cambios de comportamiento, con un `ReplicaProbe` de test (`UP` si hay conexión): prueba el enrutamiento, no la replicación.
+- [x] `PostgresReplicaProbeIT` con PostgreSQL real: nodo que no es réplica → `LAGGING`; nodo inaccesible → `DOWN`.
+- [x] Smoke test de Compose: con replicación real, `/actuator/health` muestra las 2 réplicas en `UP` (prueba de extremo a extremo de ORD-02).
 
 ### Verificación manual
-- [ ] P06: `docker stop postgres-replica1` → el log muestra `to=DOWN` en ≤ 5 s, aunque no haya tráfico.
-- [ ] P08: `docker start postgres-replica1` → el log muestra `to=UP` solo después de alcanzar `streaming`; desde ahí `REPLICA_1` vuelve a recibir lecturas.
-- [ ] `GET /actuator/health` muestra el detalle de cada réplica.
+- [x] P06: `docker stop postgres-replica1` → `to=DOWN` en ≤ 3 s, aunque no haya tráfico.
+- [x] P08: `docker start postgres-replica1` → `action=JOIN` solo después de `streaming` y de `rejoin-threshold` sondeos; desde ahí `REPLICA_1` vuelve a recibir lecturas.
+- [x] `GET /actuator/health` muestra el detalle de cada réplica y `degraded` con una caída.
 
 ---
 
@@ -651,15 +659,15 @@ Marca cada tarea cuando esté **implementada y verificada en su rama**.
 > B2 implementado y verificado en `27e25fa`, `5973d03`, `b8a7f7b`, `d19a930` y `9fa1bec`.
 
 - [x] **ORD-01** El failover de `GET /api/orders` no devuelve 500 — *B2*
-- [ ] **ORD-02** Reincorporación de réplicas solo cuando están aptas (recuperación + streaming + lag) — *B3*
+- [x] **ORD-02** Reincorporación de réplicas solo cuando están aptas (recuperación + streaming + lag) — *B3*
 - [x] **ORD-03** Logs del nodo de BD por operación + `correlationId` — *B2*
 - [x] **ORD-04** Failover en `GET /api/orders/{id}` — *B2*
-- [ ] **ORD-05** Detección proactiva de réplicas caídas — *B3*
+- [x] **ORD-05** Detección proactiva de réplicas caídas — *B3*
 - [ ] **ORD-06** Precio y nombre del producto desde inventario — *B5*
 - [ ] **ORD-07** Compensación `release` si falla la persistencia — *B5*
 - [x] **ORD-08** Tests de integración con Testcontainers + `mvn verify` en CI — *B2 (se amplía en B3)*
 - [x] **ORD-09** Health de tráfico sin dependencia de la BD compartida (readiness) — *B2, hallazgo H1*
-- [ ] Cabecera `X-Replication-Lag-Ms` — *B3*
+- [x] Cabecera `X-Replication-Lag-Ms` — *B3*
 
 ### inventory-service
 - [ ] **INV-01** Tests unitarios + integración (concurrencia) — *B4*

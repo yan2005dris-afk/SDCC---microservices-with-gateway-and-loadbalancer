@@ -36,6 +36,11 @@ management:
     web:
       exposure:
         include: health,info,metrics
+  health:
+    db:
+      # Lo reemplaza DatabaseNodesHealthIndicator: el indicador db marcaría DOWN la instancia
+      # al caer una sola réplica.
+      enabled: false
   endpoint:
     health:
       show-details: always
@@ -53,6 +58,28 @@ logging:
 
 sdcc:
   datasource:
+    username: ${DB_USER:admin}
+    password: ${DB_PASSWORD:admin_demo_change_me}
+    # Conexiones máximas por pool de tráfico (primario y cada réplica), por instancia.
+    # Total aproximado: instancias x (1 + réplicas) x pool-max-size; debe quedar por debajo
+    # de max_connections de PostgreSQL (100 por defecto).
+    pool-max-size: ${SDCC_DB_POOL_MAX_SIZE:10}
+    primary:
+      url: ${DB_PRIMARY_URL:jdbc:postgresql://localhost:5435/orders_db}
+    # Réplicas de lectura, en orden de reparto. Para agregar una, añade una entrada.
+    replicas:
+      - name: REPLICA_1
+        url: ${DB_REPLICA1_URL:jdbc:postgresql://localhost:5433/orders_db}
+      - name: REPLICA_2
+        url: ${DB_REPLICA2_URL:jdbc:postgresql://localhost:5434/orders_db}
+    health:
+      # Sondeo de todas las réplicas: caída detectada en <= interval + probe-timeout.
+      interval: ${SDCC_REPLICA_PROBE_INTERVAL:2s}
+      probe-timeout: ${SDCC_REPLICA_PROBE_TIMEOUT:1s}
+      # Apta = en recuperación + streaming + lag <= max-lag.
+      max-lag: ${SDCC_REPLICA_MAX_LAG:5s}
+      # Sondeos UP consecutivos para volver al balanceo (evita que entre y salga).
+      rejoin-threshold: ${SDCC_REPLICA_REJOIN_THRESHOLD:2}
     read:
       # Si no queda ninguna réplica sana, las lecturas ordinarias van al primario.
       fallback-to-primary: ${SDCC_READ_FALLBACK_TO_PRIMARY:true}
