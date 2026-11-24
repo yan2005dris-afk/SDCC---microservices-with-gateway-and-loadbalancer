@@ -152,16 +152,20 @@ crítico.
 
 ## Definition of Done
 
-- [ ] `@Modifying` con `clearAutomatically = true` y `flushAutomatically = true` en los 2 queries
-- [ ] Test JPA: tras el `UPDATE` masivo, la relectura ve el `stock` nuevo (falla si se quita el flag)
-- [ ] Test JPA: `qty > stock` → 0 filas afectadas y la fila queda intacta
-- [ ] Test JPA: 20 reservas concurrentes → stock 0, `reserved_stock` 20, `version` 20, 0 excepciones
-- [ ] El invariante del `remainingStock` está escrito en el código
-- [ ] `h2` en scope `test` en `inventory-service/pom.xml`
-- [ ] DoD de la spec archivada de B4-02 marcado con nota
-- [ ] Los 22 tests actuales siguen verdes sin modificarlos
-- [ ] `mvn -pl inventory-service verify` pasa
-- [ ] `mvn -pl inventory-service spotless:check` pasa
+- [x] `@Modifying` con `clearAutomatically = true` y `flushAutomatically = true` en los 2 queries
+- [x] Test JPA: tras el `UPDATE` masivo, la relectura ve el `stock` nuevo (falla si se quita el flag)
+- [x] Test JPA: `qty > stock` → 0 filas afectadas y la fila queda intacta
+- [x] Test JPA: 20 reservas concurrentes → stock 0, `reserved_stock` 20, `version` 20, 0 excepciones
+- [x] El invariante del `remainingStock` está escrito en el código
+- [x] `h2` en scope `test` en `inventory-service/pom.xml`
+- [x] DoD de la spec archivada de B4-02 marcado con nota
+- [x] Los 22 tests actuales siguen verdes sin modificarlos
+- [x] `mvn -pl inventory-service verify` pasa
+- [x] `mvn -pl inventory-service spotless:check` pasa
+
+> **DoD marcado 2026-11-24** durante la verificación `03-verify-odd` de B4-10 (resultado: **PASS**).
+> El conteo real de la rama fue 29 → 32 unit (no 22 → 25), porque B4-08 ya estaba aplicada. Evidencia completa en
+> `odd/archive/B4-10-apply-progress.md`.
 
 ---
 
@@ -245,6 +249,10 @@ JAVA_HOME=/usr/lib/jvm/java-21-openjdk mvn -pl inventory-service spotless:check
 ---
 
 ## Log
+
+**L2:** 2026-11-24 10:55 — Verificación `03-verify-odd`: **PASS**. Las 8 tasks implementadas, DoD completo, el gap
+de la caché stale fijado por un test que muere al quitar `clearAutomatically`, invariante del `remainingStock`
+escrito en el código y slice JPA contra base real. ODD **archivada** en `odd/archive/`.
 
 **L1:** 2026-11-24 09:05 — B4-10 creado. Cierra los 3 huecos del WARN de B4-02 (caché stale tras `@Modifying`,
 invariante de atomicidad del `remainingStock` sin documentar, suite solo-mock sin prueba de query real) + el

@@ -61,3 +61,31 @@ c65ebf6 refactor(inventory): delegate reserve to atomic service
 29b8002 feat(inventory): add atomic reservation service
 bae5d20 feat(inventory): add conditional atomic stock update query
 ```
+
+---
+
+## Verificación (`03-verify-odd`, 2026-11-24) — PASS (WARN cerrado)
+
+**Resultado inicial:** PASS con WARN → **WARN cerrado 2026-11-24 11:05 → veredicto final PASS**.
+
+Los 3 huecos que dejó la verificación original:
+
+| Hueco | Cerrado por | Evidencia de cierre |
+|---|---|---|
+| caché stale tras `@Modifying` | **B4-10** (PASS) | `clearAutomatically = true` en los 2 queries + test de slice JPA que **muere** al quitarlo (mutaciones M2 y M3 ✅) |
+| invariante de atomicidad del `remainingStock` sin documentar | **B4-10** (PASS) | comentario en `InventoryReservationService#reservationResponse` (`bd9cc0a`) + documentado en B4-02 y B4-10 |
+| suite solo-mock: la query nunca lo ejecuta una BD real en CI | **B4-10** (PASS) | `InventoryProductRepositoryJpaTest` ejecuta `reserveAtomically`/`releaseAtomically` contra H2: 3 tests, y el de concurrencia (20 hilos → stock 0, `reserved_stock` 20, `version` 20) falla si la query deja de ser atómica |
+
+**Re-verificación con ejecución real (2026-11-24 11:05):**
+
+- `mvn -pl inventory-service verify` → BUILD SUCCESS, 32 unit verdes ✅
+- reactor → 102 tests, 0 fallos ✅
+- `mvn -q spotless:check -pl inventory-service` → exit 0 ✅
+- commits convencionales, sin tags de IA ✅
+
+Salvedad que sigue viva (no bloquea a B4-02): los ITs con **PostgreSQL real** (`InventoryReservationIT`, 4 tests)
+siguen `skipped` por falta de daemon de Docker. La cobertura permanente con Postgres es de **B4-06** y **B4-08**;
+la evidencia de H2 no sustituye a Postgres, pero el hueco original de B4-02 (queries sin ejecutar contra ninguna BD
+en CI) ya está cubierto.
+
+**Veredicto: ✅ PASS.** Se archiva en `odd/archive/`.

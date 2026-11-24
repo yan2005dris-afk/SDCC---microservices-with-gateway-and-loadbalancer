@@ -69,8 +69,12 @@ public record ReserveStockRequest(
 - [x] Tests unitarios pasan: validación type mismatch → 400
 - [x] `mvn spotless:apply && mvn verify -pl inventory-service` pasa
 
-> **DoD marcado 2026-11-24** durante la verificación `03-verify-odd` de B4-01 (resultado: **PASS con WARN**).
-> El WARN no viene de esta lista: viene de (a) falta de test para `@NotNull` y (b) números de test incorrectos en
+> **DoD marcado 2026-11-24** durante la verificación `03-verify-odd` de B4-01 (resultado inicial: **PASS con WARN**).
+> **WARN cerrado 2026-11-24 11:05** → veredicto final **PASS**: (b) los números de test se corrigieron el mismo día
+> (ver nota en el apply-progress) y (a) la falta de test para `@NotNull` quedó cubierta por **B4-09** (verificado
+> **PASS**): al quitar el `@NotNull` de `quantity`, la suite actual **falla** (2 errores en
+> `InventoryControllerTest`), o sea que el hueco ya no existe.
+> El WARN original no venía de esta lista: venía de (a) falta de test para `@NotNull` y (b) números de test incorrectos en
 > `B4-01-apply-progress.md`. Ambos quedan trackeados en **B4-09**.
 
 ---

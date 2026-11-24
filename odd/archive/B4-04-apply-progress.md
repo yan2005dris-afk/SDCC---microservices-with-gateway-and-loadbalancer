@@ -62,3 +62,48 @@ No hubo RED observable por cambio de firma: el cambio de tipo de retorno rompía
 5c3b148 feat(inventory): return enriched reservation response
 0452b2c feat(inventory): add ReservationResponse DTO with price and name
 ```
+
+---
+
+## Verificación (`03-verify-odd`, 2026-11-24 10:55) — PASS
+
+Verificación con **ejecución real** contra `HEAD` (`adbec0c`).
+
+### Task completion
+
+| Task | Estado | Evidencia |
+|---|---|---|
+| A — `ReservationResponse` con `unitPrice` y `productName` | ✅ | `dto/ReservationResponse.java` |
+| B — el servicio devuelve valores del producto | ✅ | `InventoryReservationService#reservationResponse` usa `product.getUnitPrice()` y `product.getName()` |
+| C — el controller usa el DTO nuevo | ✅ | `InventoryController#reserveStock` devuelve `reservationService.reserveStock(...)` |
+| D — tests que verifican precio y nombre | ✅ | `InventoryReservationServiceTest` + respuesta HTTP real |
+
+### Evidencia en HTTP real (probe con H2, esquema replicado)
+
+```
+H1 primera status=200 body={"productCode":"PROD-A","available":true,"remainingStock":45,
+   "unitPrice":10.00,"productName":"Producto A","message":"Reserva confirmada"}
+```
+
+Los dos campos nuevos viajan en el body con el nombre y el tipo que fija la spec (`unitPrice` numérico,
+`productName` texto).
+
+### Cobertura de mutaciones (3/3 mueren)
+
+| # | Mutación | Resultado |
+|---|---|---|
+| B4-04-M1 | `productName` vacío en la respuesta | ✅ MUERE |
+| B4-04-M2 | `unitPrice` nulo en la respuesta | ✅ MUERE |
+| B4-04-M3 | `remainingStock` desfasado (+1) | ✅ MUERE |
+
+### Regresión de tests
+
+`inventory-service` 32 unit ✅ · reactor 102 ✅ · `mvn verify` BUILD SUCCESS ✅ · `spotless:check` exit 0 ✅.
+
+### Calidad de commits
+
+Commits convencionales, autor `Andy Alejandro <andy.alejandrovera4290@upse.edu.ec>`, sin tags de IA.
+
+### Veredicto
+
+**✅ PASS.** DoD completo, sin huecos, sin WARN. **Permanece en `odd/archive/`.**

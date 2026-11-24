@@ -61,3 +61,23 @@ Evidencia RED → GREEN:
 405376a feat(inventory): add typed ReserveStockRequest DTO
 f600719 feat(inventory): add spring-boot-starter-validation
 ```
+
+---
+
+## Verificación (`03-verify-odd`, 2026-11-24) — PASS (WARN cerrado)
+
+**Resultado inicial:** PASS con WARN → **WARN cerrado 2026-11-24 11:05 → veredicto final PASS**.
+
+| Hueco del WARN | Estado | Evidencia |
+|---|---|---|
+| (a) falta de test para el caso `quantity` ausente (`@NotNull`) | ✅ **cerrado por B4-09** | mutación: quitar `@NotNull` de `quantity` → **2 fallos** en `InventoryControllerTest` (`@Positive` y `@NotNull` sin cobertura) → el hueco ya no existe |
+| (b) números de test incorrectos en este archivo | ✅ **corregido** | la fila del reactor decía `21 → 21`; el real era **14 → 21** (nota al pie ya agregada) |
+
+**Re-verificación con ejecución real (2026-11-24 11:05):**
+
+- `mvn -pl inventory-service verify` → BUILD SUCCESS, 32 unit verdes ✅
+- reactor `inventory-service, order-service, api-gateway` → 102 tests, 0 fallos ✅
+- `mvn -q spotless:check -pl inventory-service` → exit 0 ✅
+- commits convencionales, autor `Andy Alejandro <andy.alejandrovera4290@upse.edu.ec>`, sin tags de IA ✅
+
+**Veredicto: ✅ PASS.** Se archiva en `odd/archive/`.

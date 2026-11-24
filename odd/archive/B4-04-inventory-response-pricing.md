@@ -56,14 +56,21 @@ public record ReservationResponse(
 
 ## Definition of Done
 
-- [ ] `ReservationResponse` creado con `unitPrice` y `productName`
-- [ ] Servicio retorna `ReservationResponse` con valores del producto
-- [ ] Controller usa nuevo DTO
-- [ ] Tests verifican que respuesta incluye precio y nombre
-- [ ] `mvn verify -pl inventory-service` pasa
+- [x] `ReservationResponse` creado con `unitPrice` y `productName`
+- [x] Servicio retorna `ReservationResponse` con valores del producto
+- [x] Controller usa nuevo DTO
+- [x] Tests verifican que respuesta incluye precio y nombre
+- [x] `mvn verify -pl inventory-service` pasa
+
+> **DoD marcado 2026-11-24** durante la verificación `03-verify-odd` de B4-04 (resultado: **PASS**).
+> Evidencia completa en `odd/archive/B4-04-apply-progress.md`.
 
 ---
 
 ## Log
+
+**L2:** 2026-11-24 10:55 — Verificación `03-verify-odd`: **PASS**. Las 3 mutaciones (productName vacío, unitPrice
+nulo, `remainingStock` desfasado) mueren con la suite actual; la respuesta HTTP real incluye `unitPrice` y
+`productName`. ODD verificada.
 
 **L1:** 2026-11-23 23:40 — B4-04 creado. Respuesta con precio. Resuelve INV-05.
