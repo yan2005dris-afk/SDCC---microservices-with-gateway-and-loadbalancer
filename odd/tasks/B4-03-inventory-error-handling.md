@@ -62,12 +62,20 @@
 
 ## Definition of Done
 
-- [ ] `ApiExceptionHandler` creado con 5 handlers
-- [ ] Producto no existe devuelve 404 (no 400)
-- [ ] Validación devuelve ProblemDetail
-- [ ] Stock insuficiente devuelve 400 custom `available: false`
-- [ ] Tests pasan
-- [ ] `mvn verify -pl inventory-service` pasa
+- [x] `ApiExceptionHandler` creado con 5 handlers
+- [x] Producto no existe devuelve 404 (no 400)
+- [x] Validación devuelve ProblemDetail
+- [x] Stock insuficiente devuelve 400 custom `available: false`
+- [x] Tests pasan
+- [x] `mvn verify -pl inventory-service` pasa
+
+> ⚠️ **Verificación 2026-11-24 09:40 → FAIL. B4-03 sigue ABIERTA.**
+> El DoD propio de esta ODD **sí** está cumplido (el contrato unificado de S1 funciona y tiene 6/6 handlers con
+> cobertura de mutación), **pero** el catch-all de la task Emtró las excepciones HTTP estándar de Spring MVC y
+> convirtió 405/415/404 en **500** — una **regresión** frente a `eb27734` (pre-B4-03), donde esos códigos
+> eran correctos. Además el catch-all no loguea la causa raíz y `docs/api-contracts/API_CONTRACT.md` quedó
+> desactualizado.
+> **Rework obligatorio:** `odd/tasks/B4-07-inventory-error-handling-fix.md` (aún sin implementar).
 
 ---
 
