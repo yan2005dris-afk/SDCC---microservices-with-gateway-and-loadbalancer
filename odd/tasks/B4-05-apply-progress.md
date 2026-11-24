@@ -114,3 +114,29 @@ falsa: el constraint `CHECK` **sí existe** en `02-init-schemas.sql`).
 
 **Bonus (no bloqueante):** el índice único solo se crea al inicializar una BD **nueva**. Una BD ya inicializada
 con el esquema viejo queda sin él → la idempotencia por `orderNumber` no está protegida en ese caso.
+
+---
+
+## Actualización (2026-11-24 11:05) — B4-08 cerrada en WARN, B4-05 sigue ABIERTA
+
+Los tres hallazgos de este FAIL están **corregidos en el código** por el rework B4-08
+(`odd/tasks/B4-08-inventory-idempotence-concurrency.md` + errata):
+
+| Hallazgo original | Estado tras B4-08 | Evidencia |
+|---|---|---|
+| 1 — idempotencia solo por `orderNumber` (sobreventa silenciosa multi-línea) | ✅ **corregido** | la idempotencia es por `(orderNumber, productCode)`; probe P1: 2ª línea `PROD-B` reserva de verdad (`30→27`, `reserved=3`); mutante M4 muere |
+| 2 — `releaseAtomically` sin guard `reservedStock >= :qty` | ✅ **corregido** (pero sin test) | el guard está en la query; probe P3/H2: liberar de más → **409** controlado, `reserved_stock` nunca negativo. **Gap:** el mutante M1 sobrevive (ver abajo) |
+| 3 — check-then-insert no atómico → 500 en vez de 200 | ✅ **corregido en la práctica** | probe P2: 20 hilos → `ok=20 errores=0`, stock `49/1`, **1** movimiento. La serialización la da el lock `PESSIMISTIC_WRITE` sobre la fila de producto |
+
+**B4-05 NO se archiva todavía.** Verificación de B4-08 = **WARN** con tres huecos abiertos:
+
+- **H-1** — el catch de `DataIntegrityViolationException` promete un 200 idempotente que la transacción
+  *rollback-only* no puede dar (el commit lanza `UnexpectedRollbackException` → 500). Hoy es inalcanzable por el
+  lock de fila, pero el código dice una cosa y hace otra → **B4-11**.
+- **H-2** — el guard del invariante de `release` no tiene ninguna prueba ejecutable que lo proteja (mutante M1
+  sobrevive): solo lo cubre el IT de Postgres, que queda `skipped` sin Docker → **B4-11**.
+- **H-3** — los 4 ITs de Postgres nunca se han ejecutado (daemon de Docker caído): el `FOR UPDATE` y el `CHECK`
+  reales no están validados.
+
+**Rework:** `odd/tasks/B4-11-inventory-div-idempotence-guard.md`.
+**Cierre de B4-05:** cuando B4-11 cierre sus DoD y los ITs se hayan ejecutado en un entorno con Docker.

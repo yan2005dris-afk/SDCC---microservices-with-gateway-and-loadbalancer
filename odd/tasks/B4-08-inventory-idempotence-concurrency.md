@@ -105,15 +105,25 @@ Final: stock >= 0, reserved_stock >= 0 (invariantes mantenidas)
 
 ## Definition of Done
 
-- [ ] Búsqueda de movimiento anterior por `reference_order_number` + `movement_type`
-- [ ] Segunda `/reserve` del mismo orderNumber → 200 (no descuenta)
-- [ ] `ConstraintViolationException` capturado y tratado como idempotencia
-- [ ] 20 threads `/reserve` ORD-001 → 20 × 200, stock decrementó 1 vez
-- [ ] 50 threads (reserve + release) → stock >= 0 y reserved_stock >= 0
-- [ ] Constraint `CHECK (reserved_stock >= 0)` en tabla
-- [ ] Tests concurrencia verdes (Testcontainers PostgreSQL real)
-- [ ] `mvn verify -pl inventory-service` pasa
-- [ ] `mvn spotless:check -pl inventory-service` pasa
+> Estado tras la verificación `03-verify-odd` del 2026-11-24 11:05 (veredicto **WARN**).
+> La evidencia completa está en `odd/tasks/B4-08-apply-progress.md`.
+> La S3 original ("50 threads reserve + release") fue **sustituida** por la errata E2.4: el camino real que
+> produce `reservedStock < 0` es **liberar más de lo reservado**, no la concurrencia simétrica.
+
+- [x] Búsqueda de movimiento anterior por `reference_order_number` + `movement_type` + `product_code` (errata E1)
+- [x] Segunda `/reserve` del mismo orderNumber **y mismo producto** → 200 (no descuenta)
+- [x] Mismo orderNumber con **producto distinto** → reserva la segunda línea (este caso fallaba antes)
+- [x] `DataIntegrityViolationException` capturado — **pero el camino no entrega el 200 idempotente prometido**
+      (la transacción queda *rollback-only* → `UnexpectedRollbackException` → 500). Ver **B4-11**.
+- [x] 20 threads `/reserve` (mismo order + producto) → 20 × 200, stock decrementó 1 vez (verificado con probe
+      H2 contra el esquema real; el IT de Postgres sigue sin ejecutarse localmente por falta de Docker)
+- [x] Liberar más de lo reservado → **409 controlado**, `reserved_stock` nunca negativo (errata E2.4)
+- [x] Constraint `CHECK (reserved_stock >= 0)` en tabla + índice único `(order, type, product)` + script de
+      migración para BDs ya inicializadas
+- [ ] Tests concurrencia verdes (Testcontainers PostgreSQL real) — **4 ITs `skipped`**: el daemon de Docker está
+      caído en este entorno. Es el único ítem que impide dar QA-ready.
+- [x] `mvn verify -pl inventory-service` pasa
+- [x] `mvn spotless:check -pl inventory-service` pasa
 
 ---
 
@@ -126,3 +136,13 @@ Final: stock >= 0, reserved_stock >= 0 (invariantes mantenidas)
 > necesita manejar el `DataIntegrityViolationException` como 200 idempotente.
 
 **L1:** 2026-11-24 09:00 — B4-08 creado. Rework de B4-05 tras FAIL: idempotencia fallida, concurrencia → 500 en vez de 200, reservedStock puede negativo.
+
+**L2:** 2026-11-24 11:05 — Verificación `03-verify-odd`: **WARN**. Los criterios funcionales se cumplen y están
+fijados por pruebas (idempotencia por `(order, product)`, multi-línea, 20 hilos → 20×200 con stock descontado una
+vez, release con 409 y sin `reserved_stock` negativo). Dos huecos quedan abiertos y se trasladan a **B4-11**:
+(1) el camino de `DataIntegrityViolationException` **no** entrega el 200 idempotente que promete la task D — la
+transacción queda *rollback-only* y el commit lanza `UnexpectedRollbackException` (500), y la re-lectura sobre la
+sesión envenenada lanza `AssertionFailure`; hoy eso es **inalcanzable** porque el lock `PESSIMISTIC_WRITE` sobre la
+fila de producto serializa a los competidores, así que la garantía real la da el lock y no el índice único;
+(2) el guard `p.reservedStock >= :qty` de `releaseAtomically` **no está cubierto** por ninguna prueba ejecutable en
+este entorno (el mutante sobrevive): solo lo cubre el IT de Postgres, que queda `skipped` sin Docker.
