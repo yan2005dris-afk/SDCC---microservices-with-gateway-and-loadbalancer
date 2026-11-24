@@ -1,5 +1,7 @@
 package com.distribuidos.inventory.service;
 
+import com.distribuidos.inventory.dto.ReleaseResponse;
+import com.distribuidos.inventory.dto.ReleaseResponse.ReleasedItem;
 import com.distribuidos.inventory.dto.ReservationResponse;
 import com.distribuidos.inventory.exception.InvalidStockReleaseException;
 import com.distribuidos.inventory.exception.ProductNotFoundException;
@@ -11,9 +13,7 @@ import com.distribuidos.inventory.model.StockMovement;
 import com.distribuidos.inventory.repository.InventoryProductRepository;
 import com.distribuidos.inventory.repository.StockMovementRepository;
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -57,7 +57,6 @@ public class InventoryReservationService {
   public ReservationResponse reserveStock(String productCode, int quantity, String orderNumber) {
     boolean idempotent = hasOrderNumber(orderNumber);
     if (idempotent) {
-      lockProduct(productCode);
       if (findReservation(orderNumber, productCode).isPresent()) {
         ReservationResponse replay = reservationResponse(productCode);
         logReserve(productCode, quantity, orderNumber, RESULT_OK, replay.remainingStock());
@@ -93,7 +92,7 @@ public class InventoryReservationService {
 
   /** Releases a previously reserved stock quantity; repeated calls return the same response. */
   @Transactional
-  public Map<String, Object> releaseStock(String orderNumber) {
+  public ReleaseResponse releaseStock(String orderNumber) {
     List<StockMovement> reservations =
         stockMovementRepository.findAllByReferenceOrderNumberAndType(
             orderNumber, MovementType.RESERVATION);
@@ -101,15 +100,14 @@ public class InventoryReservationService {
       throw new ReservationNotFoundException(orderNumber);
     }
 
-    List<Map<String, Object>> releases = new ArrayList<>();
+    List<ReleasedItem> releases = new ArrayList<>();
     for (StockMovement reservation : reservations) {
       String productCode = reservation.getProductCode();
       int quantity = reservation.getQuantity();
-      lockProduct(productCode);
 
       int inserted = insertMovement(productCode, MovementType.RELEASE, quantity, orderNumber);
       if (inserted == 0) {
-        releases.add(releaseResponse(productCode, quantity));
+        releases.add(ReleasedItem.released(productCode, quantity));
         continue;
       }
 
@@ -117,13 +115,10 @@ public class InventoryReservationService {
       if (updated == 0) {
         throw new InvalidStockReleaseException(productCode);
       }
-      releases.add(releaseResponse(productCode, quantity));
+      releases.add(ReleasedItem.released(productCode, quantity));
     }
 
-    Map<String, Object> response = new LinkedHashMap<>(releases.get(0));
-    response.put("orderNumber", orderNumber);
-    response.put("releases", releases);
-    return response;
+    return ReleaseResponse.of(orderNumber, releases);
   }
 
   private boolean hasOrderNumber(String orderNumber) {
@@ -154,11 +149,6 @@ public class InventoryReservationService {
         remaining);
   }
 
-  private void lockProduct(String productCode) {
-    repository
-        .findByProductCodeForUpdate(productCode)
-        .orElseThrow(() -> new ProductNotFoundException(productCode));
-  }
 
   private int insertMovement(
       String productCode, MovementType type, int quantity, String orderNumber) {
@@ -170,13 +160,9 @@ public class InventoryReservationService {
         orderNumber, MovementType.RESERVATION, productCode);
   }
 
-  private Map<String, Object> releaseResponse(String productCode, int quantity) {
-    return Map.of(
-        "productCode", productCode, "quantity", quantity, "message", "Stock liberado exitosamente");
-  }
 
   private ReservationResponse reservationResponse(String productCode) {
-    // This read must remain inside the @Transactional method that owns the row lock.
+    // Read inside the same transaction, right after the conditional UPDATE.
     // remainingStock means "stock after my reservation", not stock at response time.
     InventoryProduct product =
         repository

@@ -8,6 +8,7 @@ import com.distribuidos.order.dto.CreateOrderRequest;
 import com.distribuidos.order.dto.OrderResponse;
 import com.distribuidos.order.observability.InstanceIdentity;
 import com.distribuidos.order.service.OrderCommandService;
+import com.distribuidos.order.service.OrderCreation;
 import com.distribuidos.order.service.OrderQueryService;
 import java.util.List;
 import java.util.Optional;
@@ -32,6 +33,7 @@ public class OrderController {
   static final String HEADER_INSTANCE_ID = "X-Instance-Id";
   static final String HEADER_DATABASE_NODE = "X-Database-Node";
   static final String HEADER_CONSISTENCY = "X-Consistency";
+  static final String HEADER_IDEMPOTENCY_KEY = "Idempotency-Key";
   static final String HEADER_REPLICATION_LAG = "X-Replication-Lag-Ms";
   private static final String CRITICAL_CONSISTENCY = "critical";
 
@@ -90,16 +92,20 @@ public class OrderController {
   }
 
   /**
-   * Crea un pedido validando stock en {@code inventory-service} (P04) y escribiendo en el primario
-   * (P05).
+   * Crea un pedido. El precio y el nombre salen de inventario (ORD-06). Con {@code Idempotency-Key},
+   * un reintento devuelve el pedido ya creado ({@code 200}) sin reservar otra vez.
    *
    * @param request datos del pedido.
-   * @return pedido creado ({@code 201}).
+   * @param idempotencyKey clave de idempotencia opcional.
+   * @return {@code 201} con el pedido creado, o {@code 200} si ya existía.
    */
   @PostMapping
-  public ResponseEntity<OrderResponse> createOrder(@RequestBody CreateOrderRequest request) {
-    OrderResponse created = commandService.createOrder(request);
-    return respond(HttpStatus.CREATED, DbNode.PRIMARY, created);
+  public ResponseEntity<OrderResponse> createOrder(
+      @RequestBody CreateOrderRequest request,
+      @RequestHeader(value = HEADER_IDEMPOTENCY_KEY, required = false) String idempotencyKey) {
+    OrderCreation result = commandService.createOrder(request, idempotencyKey);
+    HttpStatus status = result.replayed() ? HttpStatus.OK : HttpStatus.CREATED;
+    return respond(status, DbNode.PRIMARY, result.order());
   }
 
   private static ReadPolicy toReadPolicy(String consistency) {

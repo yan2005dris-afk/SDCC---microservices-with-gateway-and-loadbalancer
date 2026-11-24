@@ -490,47 +490,70 @@ observability/CorrelationIdFilter, observability/InstanceIdentity, observability
 
 ## B5 · `feature/order-inventory-pricing`
 
-**Tareas:** ORD-06, ORD-07 · **Base:** `develop` con B2 y B4 · **Afecta:** P04
+**Tareas:** ORD-06, ORD-07, `Idempotency-Key`, ajustes de B4 (bloqueo redundante, `release` tipado, campo `message`) · **Base:** `develop` con B2, B3 y B4 · **Afecta:** P04
+
+> **Estado:** 🧪 implementado; tests escritos y compilados, **pendientes de ejecutar**. Marcar las casillas de tests y verificación al ejecutarlas.
 
 ### Objetivo
-Que el precio y el nombre del producto vengan de inventario, que la llamada entre servicios tenga timeouts y devuelva códigos HTTP correctos, y que haya una compensación básica si falla la persistencia del pedido.
+Que el precio y el nombre del producto vengan de inventario, que la llamada entre servicios tenga timeouts y códigos HTTP correctos, que se compense la reserva cuando el pedido no llega a registrarse, y que un reintento del cliente no duplique pedidos.
 
 ### Diseño
-- **Flujo de `OrderCommandService#createOrder`:**
-  1. Generar `orderNumber`.
-  2. `inventoryStockClient.reserve(code, qty, orderNumber)` **fuera de cualquier transacción**: no se mantiene una conexión a BD abierta durante la llamada HTTP.
-  3. Construir el `Order` con `unitPrice` y `productName` de la respuesta de inventario.
-  4. Persistir en `PRIMARY` con `TransactionTemplate`, en una transacción corta.
-  5. Si el paso 4 falla, `inventoryStockClient.release(orderNumber)` *best-effort*: si la liberación también falla, se registra en el log con `orderNumber` para reconciliarlo a mano. Es una limitación documentada; la consigna excluye las Sagas.
-- **Contrato público de `POST /api/orders`:** `unitPrice` deja de leerse. Jackson ignora los campos desconocidos, así que los clientes actuales no fallan. El cambio se documenta en API_CONTRACT (B8).
-- **Errores del cliente de inventario**, según su causa:
+```
+loadbalancer/
+  InventoryStockClient            puerto: reserve(code, qty, orderNumber) → ReservedStock; release(orderNumber)
+  LoadBalancedInventoryStockClient único lugar que conoce HTTP: traduce respuestas a excepciones de dominio
+  InventoryClientConfig / InventoryClientProperties   RestClient balanceado con connect 500 ms y read 1,5 s
+  ReservedStock                   record(productCode, productName, unitPrice) (modelo de dominio, no el DTO)
+  StockUnavailable / ProductNotFound / InventoryUnavailable(reservationMayExist) / InventoryContract
+service/
+  OrderCommandService             flujo de abajo; no conoce HTTP
+  OrderCreation(order, replayed), OrderPersistenceException
+controller/ApiExceptionHandler    400 / 422 / 502 / 503 + Retry-After, formato {error} sin cambios
+```
 
-  | Situación | Respuesta de `order-service` |
-  |---|---|
-  | Stock insuficiente (400 con `available:false`) | `400` + mensaje (como dice el PRD) |
-  | Producto inexistente (404) | `422 Unprocessable Entity` o `400` (decidirlo y documentarlo) |
-  | Inventario caído, timeout o 5xx | `503 Service Unavailable`. Hoy devuelve 400, que no es correcto |
+**Flujo de `createOrder`:**
+1. Validar y obtener `orderNumber`: `ORD-` + SHA-256(`Idempotency-Key`) truncado, o aleatorio sin clave.
+2. Con clave, si el pedido ya existe en `PRIMARY` → `200` con ese pedido (reintento).
+3. `reserve` **fuera de transacción**.
+4. Construir el pedido con el precio y el nombre de inventario y guardarlo en `PRIMARY` (transacción corta, `write-timeout` 1 s).
+5. Compensación *best-effort* `release(orderNumber)` si la reserva pudo aplicarse y el pedido no se registra: timeout o 5xx de inventario, o fallo al persistir. `release` es idempotente y tolera 404. Si también falla: `order.create … result=COMPENSATION_FAILED action=reconciliar-reserva-manualmente`.
+6. Clave duplicada en concurrencia (violación de `order_number` único) → se devuelve el pedido ganador, sin compensar.
 
-- **Timeouts del `RestClient`:** `sdcc.inventory.connect-timeout: 1s`, `sdcc.inventory.read-timeout: 2s`. El read timeout tiene que ser **menor** que el `timelimiter` del Gateway (3 s); si no, el Gateway corta antes y la compensación no llega a ejecutarse.
-- **Sin reintentos automáticos de `reserve`** en esta rama. Con la idempotencia de B4 serían seguros, pero añaden complejidad que no se necesita con la carga esperada. Se deja anotado como mejora posible.
+| Situación | Respuesta |
+|---|---|
+| Datos incompletos | `400` "Datos incompletos para crear orden" |
+| Stock insuficiente | `400` "Stock insuficiente" |
+| Producto inexistente | `422` "Producto no existe en inventario" |
+| Inventario caído, timeout o 5xx; fallo al registrar | `503` + `Retry-After: 2` |
+| Inventario rechaza la petición de `order-service` | `502` |
+
+**Presupuesto (timelimiter del Gateway = 3 s):** connect 0,5 s + read 1,5 s + escritura ≤ 1 s.
+
+**Ajustes de B4 en `inventory-service`:** se elimina `findByProductCodeForUpdate` (el `UPDATE` condicional y el `ON CONFLICT` ya garantizan la corrección); `release` devuelve `ReleaseResponse` tipado con el mismo JSON (`productCode`, `quantity`, `message`, `orderNumber`, `releases[]`); el cliente de `order-service` lee `message`.
+
+**Descartado:** reintentos automáticos de `reserve`, circuit breaker en `order-service` (dependencia nueva; bastan timeouts + CB del Gateway), Sagas (excluidas por la consigna).
 
 ### Checklist
-- [ ] `InventoryReserveRequest` + `orderNumber`. `InventoryReserveResponse` + `unitPrice`, `productName`, `message`.
-- [ ] `InventoryStockClient#release(orderNumber)` + implementación.
-- [ ] `InventoryClientProperties` (`base-url`, `connect-timeout`, `read-timeout`) + `ClientHttpRequestFactory` con timeouts.
-- [ ] Excepciones de dominio: `StockUnavailableException`, `ProductNotFoundException`, `InventoryUnavailableException`. El cliente traduce los errores HTTP a estas excepciones.
-- [ ] `OrderCommandService` con el flujo de 5 pasos.
-- [ ] `@RestControllerAdvice` en `order-service` que convierte las excepciones de dominio en `ProblemDetail` o en el `ApiErrorResponse` actual.
-- [ ] `CreateOrderRequest`: quitar `unitPrice` de `hasRequiredFields()` y del DTO.
-- [ ] Actualizar `tests/http/api-tests.http` y Bruno: quitar `unitPrice` del body.
+- [x] `InventoryStockClient#reserve(code, qty, orderNumber)` y `#release(orderNumber)`; `InventoryReserveRequest` + `orderNumber`; `InventoryReserveResponse` + `unitPrice`, `productName`, `message`.
+- [x] `InventoryClientProperties` + `InventoryClientConfig` (timeouts, `clone()` del builder balanceado).
+- [x] Excepciones de dominio y traducción HTTP en el cliente.
+- [x] `OrderCommandService` con el flujo, compensación e `Idempotency-Key`.
+- [x] `ApiExceptionHandler`: 400 / 422 / 502 / 503 + `Retry-After`.
+- [x] `CreateOrderRequest` sin `unitPrice`; `api-tests.http` y Bruno actualizados.
+- [x] Inventario: sin bloqueo redundante y `ReleaseResponse` tipado.
 
 ### Tests
-- [ ] Unitario `OrderCommandServiceTest`: reserva correcta → pedido con el precio de inventario; stock insuficiente → no persiste; inventario caído → 503 sin persistir; **fallo al persistir → se llama a `release`**.
-- [ ] `LoadBalancedInventoryStockClientTest` (`MockRestServiceServer`): mapeo de 400, 404, 503 y timeout.
+- [ ] `LoadBalancedInventoryStockClientTest` (`MockRestServiceServer`): 200, 400 por stock (`message`), 400 de validación → contrato, 404, 5xx, timeout, conexión rechazada, cuerpo incompleto, `release` 200/404/5xx.
+- [ ] `OrderCommandServiceTest`: precio de inventario, sin stock, producto inexistente, timeout → compensa, inaccesible → no compensa, fallo al persistir → compensa, compensación fallida, `Idempotency-Key` (reintento y concurrencia).
+- [ ] `OrderControllerTest`: 201, 200 con clave repetida, 400, 422, 502, 503 + `Retry-After`.
+- [ ] `OrderReadRoutingIT`: el pedido guardado usa el precio de inventario aunque el cliente envíe otro.
+- [ ] Inventario: `InventoryReservationServiceTest`, `InventoryControllerTest` y `InventoryReservationIT` sin el bloqueo y con `ReleaseResponse`.
 
 ### Verificación manual
-- [ ] P04: el pedido se crea con el `unit_price` de `inventory_db` aunque el cliente envíe otro.
-- [ ] `docker stop inventory-service` → `POST /api/orders` devuelve 503 y el pedido no se crea.
+- [ ] P04: pedido con `unitPrice` falso → se guarda con el `unit_price` de `inventory_db`.
+- [ ] Stock insuficiente → 400; producto inexistente → 422.
+- [ ] `docker stop inventory-service` → 503 + `Retry-After`, sin pedido creado.
+- [ ] `Idempotency-Key` repetida → 201 y luego 200 con el mismo pedido; el stock baja una sola vez.
 
 ---
 

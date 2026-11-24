@@ -1,5 +1,7 @@
 package com.distribuidos.inventory.controller;
 
+import com.distribuidos.inventory.dto.ReleaseResponse;
+import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -190,19 +192,16 @@ class InventoryControllerTest {
   void releaseReturnsRestoredStockResponse() throws Exception {
     when(reservationService.releaseStock("ORD-001"))
         .thenReturn(
-            Map.of(
-                "productCode",
-                "PROD-001",
-                "quantity",
-                5,
-                "message",
-                "Stock liberado exitosamente"));
+            ReleaseResponse.of(
+                "ORD-001", List.of(ReleaseResponse.ReleasedItem.released("PROD-001", 5))));
 
     performRelease("{\"orderNumber\":\"ORD-001\"}")
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.productCode").value("PROD-001"))
         .andExpect(jsonPath("$.quantity").value(5))
-        .andExpect(jsonPath("$.message").value("Stock liberado exitosamente"));
+        .andExpect(jsonPath("$.message").value("Stock liberado exitosamente"))
+        .andExpect(jsonPath("$.orderNumber").value("ORD-001"))
+        .andExpect(jsonPath("$.releases[0].productCode").value("PROD-001"));
 
     verify(reservationService).releaseStock("ORD-001");
   }

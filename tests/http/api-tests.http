@@ -41,8 +41,7 @@ X-Correlation-Id: sdcc-audit-order
   "customerName": "Cliente Demo",
   "customerEmail": "demo@example.invalid",
   "productCode": "PROD-001",
-  "quantity": 2,
-  "unitPrice": 1899.99
+  "quantity": 2
 }
 
 > {%
@@ -59,8 +58,7 @@ X-Correlation-Id: sdcc-audit-reject
   "customerName": "Cliente Sin Stock",
   "customerEmail": "sin-stock@example.invalid",
   "productCode": "PROD-001",
-  "quantity": 9999,
-  "unitPrice": 1899.99
+  "quantity": 9999
 }
 
 ### ------------------------------------------------------------------------------

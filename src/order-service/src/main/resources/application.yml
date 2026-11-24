@@ -57,6 +57,14 @@ logging:
     level: "%5p [cid=%X{correlationId:-} inst=%X{instanceId:-} db=%X{dbNode:-}]"
 
 sdcc:
+  inventory:
+    base-url: ${SDCC_INVENTORY_BASE_URL:http://inventory-service}
+    # Presupuesto de POST /api/orders (timelimiter del Gateway = 3 s):
+    # connect + read (≈ 2 s) + escritura en el primario (write-timeout 1 s) < 3 s.
+    connect-timeout: ${SDCC_INVENTORY_CONNECT_TIMEOUT:500ms}
+    read-timeout: ${SDCC_INVENTORY_READ_TIMEOUT:1500ms}
+  order:
+    write-timeout: ${SDCC_ORDER_WRITE_TIMEOUT:1s}
   datasource:
     username: ${DB_USER:admin}
     password: ${DB_PASSWORD:admin_demo_change_me}

@@ -5,8 +5,9 @@ package com.distribuidos.order.loadbalancer.dto;
  *
  * @param productCode código único del producto solicitado.
  * @param quantity cantidad positiva a descontar del inventario disponible.
+ * @param orderNumber pedido que reserva; hace la reserva idempotente en inventario.
  */
-public record InventoryReserveRequest(String productCode, int quantity) {
+public record InventoryReserveRequest(String productCode, int quantity, String orderNumber) {
 
   /** Constructor compacto que valida invariantes del contrato RPC. */
   public InventoryReserveRequest {

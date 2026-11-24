@@ -1,33 +1,31 @@
 package com.distribuidos.order.loadbalancer.dto;
 
+import java.math.BigDecimal;
+
 /**
- * Respuesta tipada de {@code POST /api/inventory/reserve} en {@code inventory-service}.
+ * Respuesta de {@code POST /api/inventory/reserve} (200 y 400 por stock insuficiente).
  *
- * @param productCode código del producto consultado.
- * @param available indicador de disponibilidad suficiente.
- * @param remainingStock stock restante tras la reserva, si aplica.
- * @param error mensaje de error de negocio en caso de rechazo.
+ * @param productCode producto.
+ * @param available si la reserva se aplicó.
+ * @param remainingStock stock tras la reserva, o disponible si no alcanzó.
+ * @param unitPrice precio unitario según inventario.
+ * @param productName nombre según inventario.
+ * @param message mensaje de inventario.
  */
 public record InventoryReserveResponse(
-    String productCode, Boolean available, Integer remainingStock, String error) {
+    String productCode,
+    Boolean available,
+    Integer remainingStock,
+    BigDecimal unitPrice,
+    String productName,
+    String message) {
 
   /**
-   * Indica de forma segura si la reserva fue aprobada por el servicio de inventario.
+   * Indica si la reserva se aplicó.
    *
-   * @return {@code true} únicamente cuando {@code available} es {@link Boolean#TRUE}.
+   * @return {@code true} solo si {@code available} es {@code true}.
    */
   public boolean isAvailable() {
     return Boolean.TRUE.equals(available);
-  }
-
-  /**
-   * Crea una respuesta de rechazo controlado ante indisponibilidad o respuesta inválida.
-   *
-   * @param productCode código de producto afectado.
-   * @param error motivo del rechazo.
-   * @return instancia no disponible.
-   */
-  public static InventoryReserveResponse unavailable(String productCode, String error) {
-    return new InventoryReserveResponse(productCode, Boolean.FALSE, 0, error);
   }
 }

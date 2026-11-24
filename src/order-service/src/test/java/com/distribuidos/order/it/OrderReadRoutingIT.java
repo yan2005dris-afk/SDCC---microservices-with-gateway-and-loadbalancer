@@ -2,6 +2,7 @@ package com.distribuidos.order.it;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.when;
 
 import com.distribuidos.order.datasource.ReplicaDataSources;
@@ -9,7 +10,8 @@ import com.distribuidos.order.datasource.health.ReplicaProbe;
 import com.distribuidos.order.datasource.health.ReplicaStatus;
 import com.distribuidos.order.dto.OrderResponse;
 import com.distribuidos.order.loadbalancer.InventoryStockClient;
-import com.distribuidos.order.loadbalancer.dto.InventoryReserveResponse;
+import com.distribuidos.order.loadbalancer.ReservedStock;
+import java.math.BigDecimal;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
@@ -132,16 +134,18 @@ class OrderReadRoutingIT {
 
     assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
     assertThat(response.getHeaders().getFirst("X-Database-Node")).isEqualTo("PRIMARY");
+    assertThat(response.getBody().totalAmount()).isEqualByComparingTo("3799.98");
     assertThat(response.getBody().customerName()).isEqualTo("PRIMARY");
   }
 
   @Test
   @Order(3)
   void writesGoOnlyToPrimary() throws SQLException {
-    when(inventoryStockClient.reserveStock(any()))
-        .thenReturn(new InventoryReserveResponse("PROD-001", true, 10, null));
+    when(inventoryStockClient.reserve(any(), anyInt(), any()))
+        .thenReturn(new ReservedStock("PROD-001", "Laptop", new BigDecimal("1899.99")));
     HttpHeaders headers = headers("Content-Type", MediaType.APPLICATION_JSON_VALUE);
-    String body = "{\"productCode\":\"PROD-001\",\"quantity\":1,\"unitPrice\":10.00}";
+    // unitPrice enviado por el cliente se ignora: manda el precio de inventario (ORD-06).
+    String body = "{\"productCode\":\"PROD-001\",\"quantity\":2,\"unitPrice\":1.00}";
 
     ResponseEntity<OrderResponse> response =
         rest.postForEntity("/api/orders", new HttpEntity<>(body, headers), OrderResponse.class);

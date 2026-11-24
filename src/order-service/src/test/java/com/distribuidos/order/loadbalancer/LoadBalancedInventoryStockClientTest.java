@@ -1,102 +1,165 @@
 package com.distribuidos.order.loadbalancer;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.content;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withBadRequest;
+import static org.springframework.test.web.client.response.MockRestResponseCreators.withException;
+import static org.springframework.test.web.client.response.MockRestResponseCreators.withResourceNotFound;
+import static org.springframework.test.web.client.response.MockRestResponseCreators.withServerError;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
-import com.distribuidos.order.dto.CreateOrderRequest;
-import com.distribuidos.order.loadbalancer.dto.InventoryReserveRequest;
-import com.distribuidos.order.loadbalancer.dto.InventoryReserveResponse;
 import java.math.BigDecimal;
+import java.net.ConnectException;
+import java.net.SocketTimeoutException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.cloud.client.DefaultServiceInstance;
-import org.springframework.cloud.client.ServiceInstance;
-import org.springframework.cloud.client.loadbalancer.CompletionContext;
-import org.springframework.cloud.client.loadbalancer.DefaultRequest;
-import org.springframework.cloud.client.loadbalancer.DefaultResponse;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
 
-/**
- * Pruebas unitarias del cliente RPC balanceado y los contratos tipados de {@code order-service}.
- */
 class LoadBalancedInventoryStockClientTest {
 
-  private MockRestServiceServer mockServer;
-  private LoadBalancedInventoryStockClient stockClient;
+  private static final String BASE = "http://inventory";
+  private static final String RESERVE = BASE + "/api/inventory/reserve";
+  private static final String RELEASE = BASE + "/api/inventory/release";
+
+  private MockRestServiceServer server;
+  private LoadBalancedInventoryStockClient client;
 
   @BeforeEach
   void setUp() {
-    RestClient.Builder builder = RestClient.builder();
-    this.mockServer = MockRestServiceServer.bindTo(builder).build();
-    this.stockClient = new LoadBalancedInventoryStockClient(builder, "http://inventory-service");
+    RestClient.Builder builder = RestClient.builder().baseUrl(BASE);
+    server = MockRestServiceServer.bindTo(builder).build();
+    client = new LoadBalancedInventoryStockClient(builder.build());
   }
 
   @Test
-  void shouldReserveStockSuccessfullyWhenInventoryAvailable() {
-    String responseJson = "{\"productCode\":\"PROD-001\",\"available\":true,\"remainingStock\":48}";
-    mockServer
-        .expect(requestTo("http://inventory-service/api/inventory/reserve"))
+  void successfulReservationReturnsInventoryPriceAndName() {
+    server
+        .expect(requestTo(RESERVE))
         .andExpect(method(HttpMethod.POST))
-        .andExpect(content().contentType(MediaType.APPLICATION_JSON))
-        .andExpect(content().json("{\"productCode\":\"PROD-001\",\"quantity\":2}"))
-        .andRespond(withSuccess(responseJson, MediaType.APPLICATION_JSON));
+        .andExpect(
+            content()
+                .json("{\"productCode\":\"PROD-001\",\"quantity\":2,\"orderNumber\":\"ORD-1\"}"))
+        .andRespond(
+            withSuccess(
+                "{\"productCode\":\"PROD-001\",\"available\":true,\"remainingStock\":48,"
+                    + "\"unitPrice\":1899.99,\"productName\":\"Laptop\"}",
+                MediaType.APPLICATION_JSON));
 
-    InventoryReserveResponse response =
-        stockClient.reserveStock(new InventoryReserveRequest("PROD-001", 2));
+    ReservedStock stock = client.reserve("PROD-001", 2, "ORD-1");
 
-    assertThat(response.isAvailable()).isTrue();
-    assertThat(response.productCode()).isEqualTo("PROD-001");
-    assertThat(response.remainingStock()).isEqualTo(48);
-    mockServer.verify();
+    assertThat(stock.unitPrice()).isEqualByComparingTo(new BigDecimal("1899.99"));
+    assertThat(stock.productName()).isEqualTo("Laptop");
+    server.verify();
   }
 
   @Test
-  void shouldReturnUnavailableWhenInventoryReturnsBadRequest() {
-    String errorJson =
-        "{\"productCode\":\"PROD-001\",\"available\":false,\"error\":\"Stock insuficiente\"}";
-    mockServer
-        .expect(requestTo("http://inventory-service/api/inventory/reserve"))
-        .andExpect(method(HttpMethod.POST))
-        .andRespond(withBadRequest().contentType(MediaType.APPLICATION_JSON).body(errorJson));
+  void insufficientStockReadsInventoryMessageField() {
+    server
+        .expect(requestTo(RESERVE))
+        .andRespond(
+            withBadRequest()
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(
+                    "{\"productCode\":\"PROD-001\",\"available\":false,\"remainingStock\":2,"
+                        + "\"message\":\"Stock insuficiente. Disponible: 2\"}"));
 
-    InventoryReserveResponse response =
-        stockClient.reserveStock(new InventoryReserveRequest("PROD-001", 999));
-
-    assertThat(response.isAvailable()).isFalse();
-    assertThat(response.error()).isEqualTo("Stock insuficiente");
-    mockServer.verify();
+    assertThatThrownBy(() -> client.reserve("PROD-001", 5, "ORD-1"))
+        .isInstanceOfSatisfying(
+            StockUnavailableException.class, ex -> assertThat(ex.remainingStock()).isEqualTo(2));
   }
 
   @Test
-  void shouldValidateStrongTypedRequestsAndLifecycle() {
-    assertThatThrownBy(() -> new InventoryReserveRequest(" ", 1))
-        .isInstanceOf(IllegalArgumentException.class);
-    assertThatThrownBy(() -> new InventoryReserveRequest("PROD-001", 0))
-        .isInstanceOf(IllegalArgumentException.class);
+  void validationProblemFromInventoryIsAContractError() {
+    server
+        .expect(requestTo(RESERVE))
+        .andRespond(
+            withBadRequest()
+                .contentType(MediaType.APPLICATION_PROBLEM_JSON)
+                .body("{\"title\":\"Bad Request\",\"status\":400,\"detail\":\"quantity\"}"));
 
-    CreateOrderRequest valid =
-        new CreateOrderRequest(null, "", "PROD-001", 2, new BigDecimal("19.99"));
-    assertThat(valid.hasRequiredFields()).isTrue();
-    assertThat(valid.resolvedCustomerName()).isEqualTo("Cliente General");
-    assertThat(valid.resolvedCustomerEmail()).isEqualTo("cliente@distribuidos.com");
+    assertThatThrownBy(() -> client.reserve("PROD-001", 1, "ORD-1"))
+        .isInstanceOf(InventoryContractException.class);
+  }
 
-    OrderLoadBalancerLifecycle lifecycle = new OrderLoadBalancerLifecycle();
-    assertThat(lifecycle.supports(Object.class, Object.class, ServiceInstance.class)).isTrue();
-    DefaultRequest<Object> request = new DefaultRequest<>();
-    DefaultResponse serverResponse =
-        new DefaultResponse(
-            new DefaultServiceInstance("inv-1", "inventory-service", "10.0.0.3", 8082, false));
-    lifecycle.onStart(request);
-    lifecycle.onStartRequest(request, serverResponse);
-    lifecycle.onComplete(
-        new CompletionContext<>(CompletionContext.Status.SUCCESS, request, serverResponse));
+  @Test
+  void unknownProductIsNotFound() {
+    server.expect(requestTo(RESERVE)).andRespond(withResourceNotFound());
+
+    assertThatThrownBy(() -> client.reserve("PROD-X", 1, "ORD-1"))
+        .isInstanceOf(ProductNotFoundException.class);
+  }
+
+  @Test
+  void serverErrorIsUnavailableAndReservationMayExist() {
+    server.expect(requestTo(RESERVE)).andRespond(withServerError());
+
+    assertThatThrownBy(() -> client.reserve("PROD-001", 1, "ORD-1"))
+        .isInstanceOfSatisfying(
+            InventoryUnavailableException.class,
+            ex -> assertThat(ex.reservationMayExist()).isTrue());
+  }
+
+  @Test
+  void readTimeoutIsUnavailableAndReservationMayExist() {
+    server
+        .expect(requestTo(RESERVE))
+        .andRespond(withException(new SocketTimeoutException("Read timed out")));
+
+    assertThatThrownBy(() -> client.reserve("PROD-001", 1, "ORD-1"))
+        .isInstanceOfSatisfying(
+            InventoryUnavailableException.class,
+            ex -> assertThat(ex.reservationMayExist()).isTrue());
+  }
+
+  @Test
+  void connectionRefusedMeansTheReservationWasNeverSent() {
+    server
+        .expect(requestTo(RESERVE))
+        .andRespond(withException(new ConnectException("Connection refused")));
+
+    assertThatThrownBy(() -> client.reserve("PROD-001", 1, "ORD-1"))
+        .isInstanceOfSatisfying(
+            InventoryUnavailableException.class,
+            ex -> assertThat(ex.reservationMayExist()).isFalse());
+  }
+
+  @Test
+  void incompleteSuccessBodyIsAContractError() {
+    server
+        .expect(requestTo(RESERVE))
+        .andRespond(
+            withSuccess(
+                "{\"productCode\":\"PROD-001\",\"available\":true}", MediaType.APPLICATION_JSON));
+
+    assertThatThrownBy(() -> client.reserve("PROD-001", 1, "ORD-1"))
+        .isInstanceOf(InventoryContractException.class);
+  }
+
+  @Test
+  void releaseSendsOrderNumberAndToleratesMissingReservation() {
+    server
+        .expect(requestTo(RELEASE))
+        .andExpect(content().json("{\"orderNumber\":\"ORD-1\"}"))
+        .andRespond(withSuccess());
+    server.expect(requestTo(RELEASE)).andRespond(withResourceNotFound());
+
+    assertThatCode(() -> client.release("ORD-1")).doesNotThrowAnyException();
+    assertThatCode(() -> client.release("ORD-1")).doesNotThrowAnyException();
+    server.verify();
+  }
+
+  @Test
+  void releaseFailureIsUnavailable() {
+    server.expect(requestTo(RELEASE)).andRespond(withServerError());
+
+    assertThatThrownBy(() -> client.release("ORD-1"))
+        .isInstanceOf(InventoryUnavailableException.class);
   }
 }
