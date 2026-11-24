@@ -1,5 +1,6 @@
 package com.distribuidos.inventory.web;
 
+import com.distribuidos.inventory.exception.ProductNotFoundException;
 import jakarta.servlet.http.HttpServletRequest;
 import java.net.URI;
 import org.springframework.http.HttpStatus;
@@ -31,6 +32,13 @@ public class ApiExceptionHandler {
       HttpMessageNotReadableException exception, HttpServletRequest request) {
     return ResponseEntity.badRequest()
         .body(problem(HttpStatus.BAD_REQUEST, "Cuerpo de solicitud inválido", request));
+  }
+
+  @ExceptionHandler(ProductNotFoundException.class)
+  ResponseEntity<ProblemDetail> handleProductNotFound(
+      ProductNotFoundException exception, HttpServletRequest request) {
+    return ResponseEntity.status(HttpStatus.NOT_FOUND)
+        .body(problem(HttpStatus.NOT_FOUND, exception.getMessage(), request));
   }
 
   private ProblemDetail problem(HttpStatus status, String detail, HttpServletRequest request) {
