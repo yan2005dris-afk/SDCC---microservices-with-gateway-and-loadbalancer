@@ -34,6 +34,7 @@ Gestiona pedidos con 2 instancias balanceadas. Contiene el enrutamiento de lectu
 - **Solución propuesta:** quitar `@Transactional` del controlador y mover la lectura a un servicio donde cada intento abra su propia transacción (por ejemplo `@Transactional(readOnly = true, propagation = REQUIRES_NEW)` por intento, o `TransactionTemplate`).
 - **Hecho cuando:** con `postgres-replica1` detenida, todas las peticiones `GET /api/orders` responden 200 desde `REPLICA_2`, incluida la primera.
 - **Prueba:** P06.
+- **Estado:** resuelto en `refactor/order-read-routing` (B2) con `RoutedReadExecutor` (una transacción por intento). Medido por el Gateway con `postgres-replica1` detenida: todas las respuestas 200 desde `REPLICA_2`, latencia máxima de unos 1,1 s.
 
 #### 🔴 ORD-02 — La reincorporación no comprueba que la réplica esté "apta"
 - **Dónde:** [ReplicaLoadBalancer.java:61-84](../../src/order-service/src/main/java/com/distribuidos/order/datasource/ReplicaLoadBalancer.java#L61-L84).
@@ -53,12 +54,14 @@ Gestiona pedidos con 2 instancias balanceadas. Contiene el enrutamiento de lectu
 - **Solución propuesta:** agregar `log.info("[DB-ROUTING] op={} node={} instance={}", ...)` en escrituras, lecturas ordinarias y lecturas críticas. Opcionalmente, persistir cada operación en la tabla `order_audit_logs`, que ya existe pero no se usa.
 - **Hecho cuando:** `docker compose logs order-service-1` muestra la alternancia `REPLICA_1`/`REPLICA_2` y las escrituras en `PRIMARY`.
 - **Prueba:** P05, P07.
+- **Estado:** resuelto en `refactor/order-read-routing` (B2): logs `db.route` por intento y por escritura, con `cid`, instancia y nodo en cada línea. Falta que `inventory-service` registre el `cid` en sus logs (ya lo recibe en la cabecera) → B4.
 
 #### 🟠 ORD-04 — `GET /api/orders/{id}` no tiene failover
 - **Dónde:** [OrderController.java:90-105](../../src/order-service/src/main/java/com/distribuidos/order/controller/OrderController.java#L90-L105).
 - **Problema:** sin la cabecera `X-Consistency: critical`, la lectura va a una réplica. Si esa réplica está caída, devuelve error y no prueba con la otra ni marca la réplica como degradada.
 - **Solución propuesta:** reutilizar la misma lógica de reintento de ORD-01.
 - **Prueba:** P06.
+- **Estado:** resuelto en `refactor/order-read-routing` (B2): usa el mismo `RoutedReadExecutor` que el listado.
 
 #### 🟠 ORD-05 — La detección de réplica caída es solo reactiva
 - **Dónde:** [ReplicaLoadBalancer.java:61-76](../../src/order-service/src/main/java/com/distribuidos/order/datasource/ReplicaLoadBalancer.java#L61-L76).
@@ -84,6 +87,7 @@ Gestiona pedidos con 2 instancias balanceadas. Contiene el enrutamiento de lectu
 #### 🟠 ORD-08 — Faltan tests de integración
 - **Problema:** AGENTS.md exige tests unitarios + de integración en CI, y solo existen tests unitarios con mocks.
 - **Solución propuesta:** test con Testcontainers (PostgreSQL) que verifique el enrutamiento `PRIMARY`/`REPLICA_*` y el failover con transacciones reales. Este test habría detectado ORD-01.
+- **Estado:** resuelto en `refactor/order-read-routing` (B2): `OrderReadRoutingIT` con primario y dos réplicas en Testcontainers, ejecutado con `mvn verify` en el CI de `order-service`. Se amplía en B3.
 
 ### Inconsistencias de documentación propias de `order-service`
 

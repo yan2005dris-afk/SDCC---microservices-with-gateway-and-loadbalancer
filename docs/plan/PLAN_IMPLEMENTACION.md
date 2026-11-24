@@ -91,7 +91,7 @@ flowchart LR
 
 **Tareas:** INF-01, INF-02, INF-03, GW-01 · **Base:** `develop` · **Bloquea:** P05, P06, P08
 
-> **Estado:** ✅ implementado y verificado (18 pasos de prueba manuales + smoke test) en los commits `9e315d8` (infra) y `ce16d7e` (gateway). **Pendiente:** push, PR y merge en `develop`.
+> **Estado:** ✅ implementado y verificado (18 pasos de prueba manuales + smoke test) en los commits `9e315d8` (infra) y `ce16d7e` (gateway). Fusionada en `develop` (PR #6).
 
 ### Objetivo
 Que las dos réplicas hagan `pg_basebackup` contra el primario, queden en `streaming` y que Compose arranque los servicios en el orden correcto.
@@ -135,7 +135,7 @@ Que las dos réplicas hagan `pg_basebackup` contra el primario, queden en `strea
 
 **Tareas:** ORD-01, ORD-03, ORD-04, ORD-08 · **Base:** `develop` (con B1 fusionada) · **Afecta:** P05, P06, P07
 
-> **Estado:** ✅ implementado y verificado (sin commit). `mvn verify`: 45 tests unitarios + 4 de integración con PostgreSQL real; smoke test en verde; P05, P06 (a través del Gateway), P07 y P08 comprobados en el clúster.
+> **Estado:** ✅ implementado y verificado en los commits `27e25fa` (apagado sin errores), `5973d03` (ORD-03), `b8a7f7b` (ORD-01, ORD-04), `d19a930` (ORD-09) y `9fa1bec` (ORD-08). `mvn verify`: 45 tests unitarios + 4 de integración con PostgreSQL real; Spotless y Checkstyle sin errores; smoke test en verde; P05, P06 (a través del Gateway), P07 y P08 comprobados en el clúster; 0 errores con tráfico continuo durante `docker stop` y `docker kill` de `order-service-1`. **Pendiente:** push, PR y merge en `develop`.
 
 ### Diagnóstico confirmado en el clúster (con `postgres-replica1` detenida)
 
@@ -560,7 +560,7 @@ Scripts reproducibles que generen la evidencia que pide el docente: distribució
 - [ ] `test-p08-replica-recovery.sh`: `docker start postgres-replica1` → `pg_stat_replication` → tiempo hasta que `REPLICA_1` vuelve a aparecer en las cabeceras.
 - [ ] Bruno: casos de stock insuficiente, P07 encadenando `res.body.id` con `bru.setVar`, inventario caído (503).
 - [ ] `tests/http/api-tests.http`: igual que Bruno, con `{{createOrderSuccess.response.body.id}}`.
-- [ ] `.gitattributes`: confirmar que `*.sh` usa `eol=lf`.
+- [x] `.gitattributes`: confirmar que `*.sh` usa `eol=lf` (ya presente: `*.sh text eol=lf`).
 
 ---
 
@@ -647,6 +647,8 @@ Marca cada tarea cuando esté **implementada y verificada en su rama**.
 - [x] Smoke test de Compose (`scripts/ci/compose-smoke.sh` + `ci-compose-smoke.yml`)
 
 ### order-service
+> B2 implementado y verificado en `27e25fa`, `5973d03`, `b8a7f7b`, `d19a930` y `9fa1bec`.
+
 - [x] **ORD-01** El failover de `GET /api/orders` no devuelve 500 — *B2*
 - [ ] **ORD-02** Reincorporación de réplicas solo cuando están aptas (recuperación + streaming + lag) — *B3*
 - [x] **ORD-03** Logs del nodo de BD por operación + `correlationId` — *B2*
