@@ -29,13 +29,13 @@ Origen: WARN **W3** de la verificación `03-verify-odd` de B4-08 (2026-11-24 11:
 
 | Alcance | Antes | Después |
 |---|---:|---:|
-| `inventory-service` (unit) | 32 | 34 (0 failures, 0 errors, 0 skipped) |
+| `inventory-service` (unit) | 32 | 36 (0 failures, 0 errors, 0 skipped) |
 | `inventory-service` IT con Postgres | 4 skipped | **5 ejecutados** (0 failures, 0 errors, 0 skipped) |
-| Reactor completo (JDK 21) | 102 | 104 (0 failures, 0 errors, 0 skipped) |
+| Reactor completo (JDK 21) | 102 | 106 (0 failures, 0 errors, 0 skipped) |
 
 ## Desviaciones / TODO / gaps
 
-- Docker/Postgres sí estuvo disponible durante la verificación: `mvn verify -pl inventory-service` ejecutó los 4 ITs
+- Docker/Postgres sí estuvo disponible durante la verificación: `mvn verify -pl inventory-service` ejecutó los 5 ITs
   con 0 fallos, 0 errores y 0 omitidos. El bloqueo originalmente previsto en el apply-progress quedó resuelto.
 - Con la política de "fallar si no hay Postgres", `mvn verify -pl inventory-service` **falla** sin Docker con un
   mensaje accionable. El ciclo rápido de desarrollo es `mvn test -pl inventory-service`.
@@ -48,7 +48,10 @@ Origen: WARN **W3** de la verificación `03-verify-odd` de B4-08 (2026-11-24 11:
 1de1baa ci(inventory): run integration tests in workflow
 68a3cbd test(inventory): fail integration tests without postgres
 245126e docs(inventory): document local Docker test routes
+f72f540 test(inventory): cover postgres conflict-safe insert
+87470dc test(inventory): pin idempotency guard invariants
 ```
 
-E verificado con JDK 21: `mvn verify -pl inventory-service` (32 unit + 4 IT, 0 omitidos),
-`mvn -q spotless:check -pl inventory-service`, y `mvn test` en el reactor completo (102 tests).
+Verificado con JDK 21: `mvn verify -pl inventory-service` (36 unit + 5 IT, 0 omitidos),
+`mvn -q spotless:check -pl inventory-service`, y `mvn test` en el reactor completo (106 tests:
+gateway 7, order 63, inventory 36).

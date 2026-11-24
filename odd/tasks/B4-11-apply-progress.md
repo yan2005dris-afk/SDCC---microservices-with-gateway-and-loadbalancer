@@ -15,39 +15,42 @@ Decisión del humano (2026-11-24): **opción A** — el 200 idempotente debe ser
 - [x] C2 — **Reordenar** `reserveStock` / `releaseStock`: insertar el movimiento **antes** del UPDATE de stock, y en caso de conflicto re-leer el ganador y responder 200 **sin tocar el stock**
 - [x] C3 — IT de Postgres del camino de conflicto (necesita **B4-12** para correr en CI)
 - [x] D — Documentar en el servicio la garantía real (lock de fila principal, índice único como red de seguridad)
-- [ ] E — Reflejar la decisión en el ODD de B4-08 y en `API_CONTRACT.md`
-- [ ] F — Verificación: `mvn -pl inventory-service verify` + `spotless:check` + batería de mutaciones
+- [x] E — Reflejar la decisión en el ODD de B4-08 y en `API_CONTRACT.md`
+- [x] F — Verificación: `mvn -pl inventory-service verify` + `spotless:check` + batería de mutaciones
 
 ## Definition of Done
 
 - [x] Test de slice JPA: `releaseAtomically` con stock reservado insuficiente → 0 filas y fila intacta
-- [ ] Ese test **falla** si se quita el guard `p.reservedStock >= :qty` (mutante M1 muere)
+- [x] Ese test **falla** si se quita el guard `p.reservedStock >= :qty` (mutante M1 muere)
 - [x] Test que fija la serialización por lock de fila (mutante M10 muere)
+- [x] Test que fija el `flushAutomatically` del bulk update (mutante M7 muere)
 - [x] Opción A aplicada: insert con `ON CONFLICT DO NOTHING` (opción A, decidida por el humano)
 - [x] El movimiento se inserta **antes** del UPDATE de stock; en conflicto **no** se toca el stock
 - [x] Conflicto → 200 con el movimiento ganador, sin excepción y sin transacción *rollback-only*
 - [x] La cadena de garantías (lock → `ON CONFLICT` → índice único) está escrita en el servicio
-- [ ] El invariante de la idempotencia (lock + índice único) está escrito en el código y en el ODD de B4-08
-- [ ] `API_CONTRACT.md` refleja la respuesta actual de `/release`
-- [ ] Los 32 tests actuales de `inventory-service` siguen verdes
-- [ ] `mvn -pl inventory-service verify` pasa
-- [ ] `mvn -pl inventory-service spotless:check` pasa
-- [ ] Batería de mutaciones repetida: M1, M10 y M7 quedan cubiertos
+- [x] El invariante de la idempotencia (lock + índice único) está escrito en el código y en el ODD de B4-08
+- [x] `API_CONTRACT.md` refleja la respuesta actual de `/release`
+- [x] Los 36 tests actuales de `inventory-service` siguen verdes
+- [x] `mvn -pl inventory-service verify` pasa
+- [x] `mvn -pl inventory-service spotless:check` pasa
+- [x] Batería de mutaciones repetida: M1, M10 y M7 quedan cubiertos
 
 ## Tests
 
 | Alcance | Antes | Después |
 |---|---:|---:|
-| `inventory-service` (unit) | 32 | 34+ (0 failures, 0 errors, 0 skipped) |
-| Reactor completo (JDK 21) | 102 | 104+ (0 failures, 0 errors, 0 skipped) |
-| `inventory-service` IT con Docker | 4 skipped | 4 skipped (sin daemon en este entorno) |
+| `inventory-service` (unit) | 32 | 36 (0 failures, 0 errors, 0 skipped) |
+| `inventory-service` IT con Docker | 4 skipped | 5 ejecutados (0 failures, 0 errors, 0 skipped) |
+| Reactor completo (JDK 21) | 102 | 106 (0 failures, 0 errors, 0 skipped) |
 
 ## Desviaciones / TODO / gaps
 
 - Docker/Postgres disponible: los ITs de `InventoryReservationIT`, incluido el nuevo test de conflicto, corren con
   Postgres real. La omisión silenciosa quedó eliminada en B4-12.
-- El mutante M7 (`flushAutomatically` de `reserveAtomically`) sobrevive: es un gap menor, pero está listado en el
-  DoD para que la batería de mutaciones quede completa.
+- Batería de mutaciones completada: M1 (guard de `releaseAtomically`) muere con
+  `releaseBelowReservedStockUpdatesNoRows`; M10 (`@Lock(PESSIMISTIC_WRITE)`) muere con
+  `forUpdateLookupUsesPessimisticWriteLock`; M7 (`flushAutomatically`) muere con
+  `reserveBulkUpdateFlushesBeforeExecuting`. Los tres mutantes fueron restaurados.
 - La opción A de S2 usa `ON CONFLICT DO NOTHING`, que es SQL nativo de Postgres: su test **tiene** que vivir en el
   IT de Postgres (no en el slice H2). B4-12 es lo que habilita esa verificación (ITs en CI + Postgres real).
 - `ON CONFLICT (cols) WHERE predicado DO NOTHING` exige que el objetivo de conflicto coincida con el índice **y su
@@ -61,5 +64,8 @@ Decisión del humano (2026-11-24): **opción A** — el 200 idempotente debe ser
 ## Commits
 
 ```
-(ninguno todavía)
+66c8965 test(inventory): pin release stock guard in jpa slice
+28cc5d2 feat(inventory): make stock idempotency conflict-safe
+f72f540 test(inventory): cover postgres conflict-safe insert
+87470dc test(inventory): pin idempotency guard invariants
 ```
