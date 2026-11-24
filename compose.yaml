@@ -191,7 +191,7 @@ services:
       - DB_PASSWORD=${POSTGRES_PASSWORD:-admin_demo_change_me}
       - SPRING_PROFILES_ACTIVE=docker
     healthcheck:
-      test: ["CMD", "curl", "-fs", "http://localhost:8081/actuator/health"]
+      test: ["CMD", "curl", "-fs", "http://localhost:8081/actuator/health/readiness"]
       interval: 10s
       timeout: 5s
       retries: 3
@@ -233,7 +233,7 @@ services:
       - DB_PASSWORD=${POSTGRES_PASSWORD:-admin_demo_change_me}
       - SPRING_PROFILES_ACTIVE=docker
     healthcheck:
-      test: ["CMD", "curl", "-fs", "http://localhost:8081/actuator/health"]
+      test: ["CMD", "curl", "-fs", "http://localhost:8081/actuator/health/readiness"]
       interval: 10s
       timeout: 5s
       retries: 3
@@ -273,7 +273,7 @@ services:
       - DB_PASSWORD=${POSTGRES_PASSWORD:-admin_demo_change_me}
       - SPRING_PROFILES_ACTIVE=docker
     healthcheck:
-      test: ["CMD", "curl", "-fs", "http://localhost:8082/actuator/health"]
+      test: ["CMD", "curl", "-fs", "http://localhost:8082/actuator/health/readiness"]
       interval: 10s
       timeout: 5s
       retries: 3

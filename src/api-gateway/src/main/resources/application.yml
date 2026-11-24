@@ -13,7 +13,8 @@ spring:
         initial-delay: 1s
         interval: 5s
         path:
-          default: /actuator/health
+          # Readiness: no depende de la BD compartida (ver order-service).
+          default: /actuator/health/readiness
       cache:
         enabled: true
         ttl: 5s
@@ -112,7 +113,7 @@ eureka:
 sdcc:
   loadbalancer:
     health-check-interval: 5s
-    health-check-path: /actuator/health
+    health-check-path: /actuator/health/readiness
     cache-ttl: 5s
 
 management:

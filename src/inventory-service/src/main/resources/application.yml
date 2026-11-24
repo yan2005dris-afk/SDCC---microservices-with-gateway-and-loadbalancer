@@ -39,3 +39,9 @@ management:
   endpoint:
     health:
       show-details: always
+      # /actuator/health/readiness decide si la instancia recibe tráfico (Gateway y Docker).
+      # No incluye la BD a propósito: primario y réplicas son compartidos por todas las
+      # instancias, y si su caída marcara DOWN a todas, una réplica caída cortaría el
+      # servicio completo (fallo en cascada). /actuator/health sigue mostrando la BD.
+      probes:
+        enabled: true
