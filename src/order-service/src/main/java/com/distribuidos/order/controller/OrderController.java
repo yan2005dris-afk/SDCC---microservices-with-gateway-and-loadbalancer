@@ -1,8 +1,9 @@
 package com.distribuidos.order.controller;
 
-import com.distribuidos.order.datasource.DataSourceType;
+import com.distribuidos.order.datasource.DbNode;
 import com.distribuidos.order.datasource.ReadPolicy;
 import com.distribuidos.order.datasource.RoutedResult;
+import com.distribuidos.order.datasource.health.ReplicaStatusView;
 import com.distribuidos.order.dto.CreateOrderRequest;
 import com.distribuidos.order.dto.OrderResponse;
 import com.distribuidos.order.observability.InstanceIdentity;
@@ -31,11 +32,13 @@ public class OrderController {
   static final String HEADER_INSTANCE_ID = "X-Instance-Id";
   static final String HEADER_DATABASE_NODE = "X-Database-Node";
   static final String HEADER_CONSISTENCY = "X-Consistency";
+  static final String HEADER_REPLICATION_LAG = "X-Replication-Lag-Ms";
   private static final String CRITICAL_CONSISTENCY = "critical";
 
   private final OrderQueryService queryService;
   private final OrderCommandService commandService;
   private final InstanceIdentity instanceIdentity;
+  private final ReplicaStatusView replicaStatus;
 
   /**
    * Crea el controlador.
@@ -43,14 +46,17 @@ public class OrderController {
    * @param queryService casos de uso de lectura.
    * @param commandService caso de uso de creación.
    * @param instanceIdentity identidad de esta instancia.
+   * @param replicaStatus estado de las réplicas (lag del último sondeo).
    */
   public OrderController(
       OrderQueryService queryService,
       OrderCommandService commandService,
-      InstanceIdentity instanceIdentity) {
+      InstanceIdentity instanceIdentity,
+      ReplicaStatusView replicaStatus) {
     this.queryService = queryService;
     this.commandService = commandService;
     this.instanceIdentity = instanceIdentity;
+    this.replicaStatus = replicaStatus;
   }
 
   /**
@@ -93,7 +99,7 @@ public class OrderController {
   @PostMapping
   public ResponseEntity<OrderResponse> createOrder(@RequestBody CreateOrderRequest request) {
     OrderResponse created = commandService.createOrder(request);
-    return respond(HttpStatus.CREATED, DataSourceType.PRIMARY, created);
+    return respond(HttpStatus.CREATED, DbNode.PRIMARY, created);
   }
 
   private static ReadPolicy toReadPolicy(String consistency) {
@@ -102,10 +108,17 @@ public class OrderController {
         : ReadPolicy.ORDINARY;
   }
 
-  private <T> ResponseEntity<T> respond(HttpStatus status, DataSourceType node, T body) {
-    return ResponseEntity.status(status)
-        .header(HEADER_INSTANCE_ID, instanceIdentity.id())
-        .header(HEADER_DATABASE_NODE, node.name())
-        .body(body);
+  private <T> ResponseEntity<T> respond(HttpStatus status, DbNode node, T body) {
+    ResponseEntity.BodyBuilder response =
+        ResponseEntity.status(status)
+            .header(HEADER_INSTANCE_ID, instanceIdentity.id())
+            .header(HEADER_DATABASE_NODE, node.name());
+    if (!node.isPrimary()) {
+      // Lag del último sondeo de la réplica que respondió; no se consulta en cada petición.
+      replicaStatus
+          .lagMs(node)
+          .ifPresent(lag -> response.header(HEADER_REPLICATION_LAG, Long.toString(lag)));
+    }
+    return response.body(body);
   }
 }

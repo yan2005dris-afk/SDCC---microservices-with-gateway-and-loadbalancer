@@ -10,10 +10,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.distribuidos.order.datasource.DataSourceType;
+import com.distribuidos.order.datasource.DbNode;
 import com.distribuidos.order.datasource.ReadNodesUnavailableException;
 import com.distribuidos.order.datasource.ReadPolicy;
 import com.distribuidos.order.datasource.RoutedResult;
+import com.distribuidos.order.datasource.health.ReplicaStatusView;
 import com.distribuidos.order.dto.OrderItemResponse;
 import com.distribuidos.order.dto.OrderResponse;
 import com.distribuidos.order.observability.InstanceIdentity;
@@ -24,6 +25,7 @@ import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
+import java.util.OptionalLong;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -39,7 +41,11 @@ import org.springframework.test.web.servlet.MockMvc;
 @TestPropertySource(properties = "INSTANCE_ID=order-service-1:8081")
 class OrderControllerTest {
 
+  private static final DbNode REPLICA_1 = new DbNode("REPLICA_1");
+  private static final DbNode REPLICA_2 = new DbNode("REPLICA_2");
+
   @Autowired private MockMvc mvc;
+  @MockitoBean private ReplicaStatusView replicaStatus;
   @MockitoBean private OrderQueryService queryService;
   @MockitoBean private OrderCommandService commandService;
 
@@ -65,7 +71,7 @@ class OrderControllerTest {
   @Test
   void listReturnsOrdersWithRoutingHeadersAndSameJsonShape() throws Exception {
     when(queryService.listOrders())
-        .thenReturn(new RoutedResult<>(List.of(order(1L, "Ana")), DataSourceType.REPLICA_2, 1));
+        .thenReturn(new RoutedResult<>(List.of(order(1L, "Ana")), REPLICA_2, 1));
 
     mvc.perform(get("/api/orders"))
         .andExpect(status().isOk())
@@ -82,7 +88,7 @@ class OrderControllerTest {
   @Test
   void getByIdUsesCriticalPolicyWithConsistencyHeader() throws Exception {
     when(queryService.findOrder(eq(1L), eq(ReadPolicy.CRITICAL)))
-        .thenReturn(new RoutedResult<>(Optional.of(order(1L, "Ana")), DataSourceType.PRIMARY, 1));
+        .thenReturn(new RoutedResult<>(Optional.of(order(1L, "Ana")), DbNode.PRIMARY, 1));
 
     mvc.perform(get("/api/orders/1").header("X-Consistency", "critical"))
         .andExpect(status().isOk())
@@ -93,7 +99,7 @@ class OrderControllerTest {
   @Test
   void getByIdUsesOrdinaryPolicyByDefault() throws Exception {
     when(queryService.findOrder(eq(1L), eq(ReadPolicy.ORDINARY)))
-        .thenReturn(new RoutedResult<>(Optional.of(order(1L, "Ana")), DataSourceType.REPLICA_1, 1));
+        .thenReturn(new RoutedResult<>(Optional.of(order(1L, "Ana")), REPLICA_1, 1));
 
     mvc.perform(get("/api/orders/1"))
         .andExpect(status().isOk())
@@ -104,7 +110,7 @@ class OrderControllerTest {
   @Test
   void getByIdReturns404WhenOrderDoesNotExist() throws Exception {
     when(queryService.findOrder(any(), any()))
-        .thenReturn(new RoutedResult<>(Optional.empty(), DataSourceType.REPLICA_1, 1));
+        .thenReturn(new RoutedResult<>(Optional.empty(), REPLICA_1, 1));
 
     mvc.perform(get("/api/orders/999"))
         .andExpect(status().isNotFound())
@@ -149,10 +155,29 @@ class OrderControllerTest {
 
   @Test
   void incomingCorrelationIdIsEchoed() throws Exception {
-    when(queryService.listOrders())
-        .thenReturn(new RoutedResult<>(List.of(), DataSourceType.REPLICA_1, 1));
+    when(queryService.listOrders()).thenReturn(new RoutedResult<>(List.of(), REPLICA_1, 1));
 
     mvc.perform(get("/api/orders").header("X-Correlation-Id", "trace-123"))
         .andExpect(header().string("X-Correlation-Id", "trace-123"));
+  }
+
+  @Test
+  void replicaReadIncludesReplicationLagFromLastProbe() throws Exception {
+    when(queryService.listOrders()).thenReturn(new RoutedResult<>(List.of(), REPLICA_2, 1));
+    when(replicaStatus.lagMs(REPLICA_2)).thenReturn(OptionalLong.of(42));
+
+    mvc.perform(get("/api/orders"))
+        .andExpect(status().isOk())
+        .andExpect(header().string("X-Database-Node", "REPLICA_2"))
+        .andExpect(header().string("X-Replication-Lag-Ms", "42"));
+  }
+
+  @Test
+  void primaryResponseHasNoReplicationLagHeader() throws Exception {
+    when(queryService.listOrders()).thenReturn(new RoutedResult<>(List.of(), DbNode.PRIMARY, 3));
+
+    mvc.perform(get("/api/orders"))
+        .andExpect(status().isOk())
+        .andExpect(header().doesNotExist("X-Replication-Lag-Ms"));
   }
 }

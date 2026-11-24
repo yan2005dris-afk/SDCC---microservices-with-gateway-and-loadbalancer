@@ -15,14 +15,14 @@ public interface ReplicaSelector {
    *
    * @return réplica elegida, o vacío si no queda ninguna sana.
    */
-  Optional<DataSourceType> next();
+  Optional<DbNode> next();
 
   /**
    * Retira una réplica del reparto tras un fallo de conexión.
    *
    * @param replica réplica que falló.
    */
-  void markDown(DataSourceType replica);
+  void markDown(DbNode replica);
 
   /**
    * Número de réplicas configuradas, sanas o no. Acota los intentos de failover.

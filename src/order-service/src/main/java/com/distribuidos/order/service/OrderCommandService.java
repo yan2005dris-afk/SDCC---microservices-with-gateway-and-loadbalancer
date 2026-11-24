@@ -1,6 +1,6 @@
 package com.distribuidos.order.service;
 
-import com.distribuidos.order.datasource.DataSourceType;
+import com.distribuidos.order.datasource.DbNode;
 import com.distribuidos.order.datasource.RoutingContextHolder;
 import com.distribuidos.order.dto.CreateOrderRequest;
 import com.distribuidos.order.dto.OrderResponse;
@@ -90,14 +90,14 @@ public class OrderCommandService {
 
   private OrderResponse persist(Order order) {
     long start = System.nanoTime();
-    RoutingContextHolder.set(DataSourceType.PRIMARY);
-    MDC.put(MdcKeys.DB_NODE, DataSourceType.PRIMARY.name());
+    RoutingContextHolder.set(DbNode.PRIMARY);
+    MDC.put(MdcKeys.DB_NODE, DbNode.PRIMARY.name());
     try {
       OrderResponse saved =
           writeTransaction.execute(status -> OrderResponse.from(orderRepository.save(order)));
       log.info(
           "db.route op=WRITE node={} result=OK durationMs={}",
-          DataSourceType.PRIMARY,
+          DbNode.PRIMARY,
           TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start));
       return saved;
     } finally {
