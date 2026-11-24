@@ -15,11 +15,20 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** Reserves stock through a single conditional UPDATE, avoiding read-modify-write conflicts. */
+/**
+ * Reserves stock with a three-layer guarantee chain:
+ *
+ * <ol>
+ *   <li>the product row is locked with {@code FOR UPDATE} before any idempotency check;
+ *   <li>the movement is inserted before the stock update with {@code ON CONFLICT DO NOTHING}, so a
+ *       duplicate request never reaches the update;
+ *   <li>the partial unique index on {@code (reference_order_number, movement_type, product_code)}
+ *       is the database-level safety net.
+ * </ol>
+ */
 @Service
 public class InventoryReservationService {
 
@@ -37,28 +46,28 @@ public class InventoryReservationService {
   public ReservationResponse reserveStock(String productCode, int quantity, String orderNumber) {
     boolean idempotent = hasOrderNumber(orderNumber);
     if (idempotent) {
-      repository
-          .findByProductCodeForUpdate(productCode)
-          .orElseThrow(() -> new ProductNotFoundException(productCode));
+      lockProduct(productCode);
       if (findReservation(orderNumber, productCode).isPresent()) {
         return reservationResponse(productCode);
       }
     }
 
-    try {
-      int updated = repository.reserveAtomically(productCode, quantity);
-      if (updated == 0) {
-        InventoryProduct product =
-            repository
-                .findByProductCode(productCode)
-                .orElseThrow(() -> new ProductNotFoundException(productCode));
-        throw new StockUnavailableException(productCode, product.getStock());
-      }
-      saveMovement(productCode, MovementType.RESERVATION, quantity, orderNumber);
-    } catch (DataIntegrityViolationException exception) {
-      if (!idempotent || findReservation(orderNumber, productCode).isEmpty()) {
-        throw exception;
-      }
+    int inserted = insertMovement(productCode, MovementType.RESERVATION, quantity, orderNumber);
+    if (inserted == 0) {
+      // The unique index has already recorded the winner. Re-read it and leave stock untouched.
+      findReservation(orderNumber, productCode)
+          .orElseThrow(
+              () -> new IllegalStateException("Conflicting reservation movement not found"));
+      return reservationResponse(productCode);
+    }
+
+    int updated = repository.reserveAtomically(productCode, quantity);
+    if (updated == 0) {
+      InventoryProduct product =
+          repository
+              .findByProductCode(productCode)
+              .orElseThrow(() -> new ProductNotFoundException(productCode));
+      throw new StockUnavailableException(productCode, product.getStock());
     }
 
     return reservationResponse(productCode);
@@ -78,12 +87,10 @@ public class InventoryReservationService {
     for (StockMovement reservation : reservations) {
       String productCode = reservation.getProductCode();
       int quantity = reservation.getQuantity();
-      repository
-          .findByProductCodeForUpdate(productCode)
-          .orElseThrow(() -> new ProductNotFoundException(productCode));
+      lockProduct(productCode);
 
-      if (stockMovementRepository.existsByReferenceOrderNumberAndTypeAndProductCode(
-          orderNumber, MovementType.RELEASE, productCode)) {
+      int inserted = insertMovement(productCode, MovementType.RELEASE, quantity, orderNumber);
+      if (inserted == 0) {
         releases.add(releaseResponse(productCode, quantity));
         continue;
       }
@@ -91,15 +98,6 @@ public class InventoryReservationService {
       int updated = repository.releaseAtomically(productCode, quantity);
       if (updated == 0) {
         throw new InvalidStockReleaseException(productCode);
-      }
-
-      try {
-        saveMovement(productCode, MovementType.RELEASE, quantity, orderNumber);
-      } catch (DataIntegrityViolationException exception) {
-        if (!stockMovementRepository.existsByReferenceOrderNumberAndTypeAndProductCode(
-            orderNumber, MovementType.RELEASE, productCode)) {
-          throw exception;
-        }
       }
       releases.add(releaseResponse(productCode, quantity));
     }
@@ -114,19 +112,20 @@ public class InventoryReservationService {
     return orderNumber != null && !orderNumber.isBlank();
   }
 
+  private void lockProduct(String productCode) {
+    repository
+        .findByProductCodeForUpdate(productCode)
+        .orElseThrow(() -> new ProductNotFoundException(productCode));
+  }
+
+  private int insertMovement(
+      String productCode, MovementType type, int quantity, String orderNumber) {
+    return stockMovementRepository.insertIfAbsent(productCode, type.name(), quantity, orderNumber);
+  }
+
   private Optional<StockMovement> findReservation(String orderNumber, String productCode) {
     return stockMovementRepository.findByReferenceOrderNumberAndTypeAndProductCode(
         orderNumber, MovementType.RESERVATION, productCode);
-  }
-
-  private void saveMovement(
-      String productCode, MovementType type, int quantity, String orderNumber) {
-    StockMovement movement = new StockMovement();
-    movement.setProductCode(productCode);
-    movement.setType(type);
-    movement.setQuantity(quantity);
-    movement.setReferenceOrderNumber(orderNumber);
-    stockMovementRepository.save(movement);
   }
 
   private Map<String, Object> releaseResponse(String productCode, int quantity) {
