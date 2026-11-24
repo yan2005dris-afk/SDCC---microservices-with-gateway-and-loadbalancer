@@ -49,6 +49,29 @@ class TransientConnectionFailuresTest {
   }
 
   @Test
+  void serverShutdownWhileConnectedIsTransient() {
+    // Observado en CI: el contenedor detenido envió "unexpected postmaster exit" (57P02) y
+    // Hibernate lo envolvió como GenericJDBCException, no como JDBCConnectionException.
+    for (String state : new String[] {"57P01", "57P02", "57P03"}) {
+      RuntimeException wrapped =
+          new RuntimeException(
+              "JDBC exception executing SQL",
+              new SQLException("FATAL: terminating connection", state));
+
+      assertThat(TransientConnectionFailures.isTransient(wrapped)).as(state).isTrue();
+    }
+  }
+
+  @Test
+  void otherOperatorInterventionStatesAreNotTransient() {
+    // 57014 = query_canceled (p. ej. statement timeout): reintentar en otro nodo no corresponde.
+    assertThat(
+            TransientConnectionFailures.isTransient(
+                new SQLException("canceling statement due to statement timeout", "57014")))
+        .isFalse();
+  }
+
+  @Test
   void sqlErrorIsNotTransient() {
     RuntimeException grammar =
         new InvalidDataAccessResourceUsageException(
