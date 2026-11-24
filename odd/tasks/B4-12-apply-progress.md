@@ -11,7 +11,7 @@ Origen: WARN **W3** de la verificación `03-verify-odd` de B4-08 (2026-11-24 11:
 - [x] B — Quitar `disabledWithoutDocker = true` + chequeo explícito que **falla** con mensaje accionable
 - [ ] C — Test de conflicto `ON CONFLICT DO NOTHING` (coordinado con B4-11, task H)
 - [x] D — Documentar la ruta local con y sin Docker
-- [ ] E — Verificación: `verify` con Docker, `test` sin Docker, `spotless:check`
+- [x] E — Verificación: `verify` con Docker, `test` sin Docker, `spotless:check`
 
 ## Definition of Done
 
@@ -21,9 +21,9 @@ Origen: WARN **W3** de la verificación `03-verify-odd` de B4-08 (2026-11-24 11:
 - [x] El mensaje dice qué se necesita y cuál es el comando alternativo (`mvn test`) para el ciclo rápido
 - [ ] El IT de conflicto `ON CONFLICT` (B4-11) está escrito y corre en CI
 - [x] La ruta local con/sin Docker está documentada
-- [ ] `mvn -pl inventory-service verify` pasa en un entorno con Docker
-- [ ] `mvn -pl inventory-service test` sigue pasando sin Docker (ciclo rápido)
-- [ ] `mvn -pl inventory-service spotless:check` pasa
+- [x] `mvn -pl inventory-service verify` pasa en un entorno con Docker
+- [x] `mvn -pl inventory-service test` sigue pasando sin Docker (ciclo rápido)
+- [x] `mvn -pl inventory-service spotless:check` pasa
 
 ## Tests
 
@@ -31,7 +31,7 @@ Origen: WARN **W3** de la verificación `03-verify-odd` de B4-08 (2026-11-24 11:
 |---|---:|---:|
 | `inventory-service` (unit) | 32 | 32 (0 failures, 0 errors, 0 skipped) |
 | `inventory-service` IT con Postgres | 4 skipped | **4 ejecutados** (0 failures, 0 errors, 0 skipped) |
-| Reactor completo (JDK 21) | 102 | pendiente de ejecución final |
+| Reactor completo (JDK 21) | 102 | 102 (0 failures, 0 errors, 0 skipped) |
 
 ## Desviaciones / TODO / gaps
 
@@ -45,5 +45,10 @@ Origen: WARN **W3** de la verificación `03-verify-odd` de B4-08 (2026-11-24 11:
 ## Commits
 
 ```
-(ninguno todavía)
+1de1baa ci(inventory): run integration tests in workflow
+68a3cbd test(inventory): fail integration tests without postgres
+245126e docs(inventory): document local Docker test routes
 ```
+
+E verificado con JDK 21: `mvn verify -pl inventory-service` (32 unit + 4 IT, 0 omitidos),
+`mvn -q spotless:check -pl inventory-service`, y `mvn test` en el reactor completo (102 tests).
