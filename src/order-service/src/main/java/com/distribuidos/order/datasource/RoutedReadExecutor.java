@@ -3,6 +3,7 @@ package com.distribuidos.order.datasource;
 import com.distribuidos.order.observability.MdcKeys;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -110,8 +111,18 @@ public class RoutedReadExecutor {
     long start = System.nanoTime();
     RoutingContextHolder.set(node);
     MDC.put(MdcKeys.DB_NODE, node.name());
+    AtomicReference<RuntimeException> queryFailure = new AtomicReference<>();
     try {
-      T value = readTransaction.execute(status -> query.get());
+      T value =
+          readTransaction.execute(
+              status -> {
+                try {
+                  return query.get();
+                } catch (RuntimeException ex) {
+                  queryFailure.set(ex);
+                  throw ex;
+                }
+              });
       log.info(
           "db.route op=READ policy={} node={} attempt={} result=OK durationMs={}",
           policy,
@@ -120,18 +131,35 @@ public class RoutedReadExecutor {
           elapsedMillis(start));
       return new RoutedResult<>(value, node, attempt);
     } catch (RuntimeException ex) {
+      RuntimeException failure = originalFailure(queryFailure.get(), ex);
       log.warn(
           "db.route op=READ policy={} node={} attempt={} result=FAILED error={} durationMs={}",
           policy,
           node,
           attempt,
-          ex.getClass().getSimpleName(),
+          failure.getClass().getSimpleName(),
           elapsedMillis(start));
-      throw ex;
+      throw failure;
     } finally {
       RoutingContextHolder.clear();
       MDC.remove(MdcKeys.DB_NODE);
     }
+  }
+
+  /**
+   * Devuelve el error de la consulta aunque el rollback posterior haya fallado.
+   *
+   * <p>Si la conexión se cae a mitad de la consulta, Hikari la cierra y el rollback de {@code
+   * TransactionTemplate} falla con "Connection is closed". Spring propaga entonces el error del
+   * rollback y oculta el de la consulta, que es el que indica un fallo de conexión reintentable.
+   * Por eso se decide con el error original y el del rollback queda como {@code suppressed}.
+   */
+  private static RuntimeException originalFailure(RuntimeException query, RuntimeException thrown) {
+    if (query == null || query == thrown) {
+      return thrown;
+    }
+    query.addSuppressed(thrown);
+    return query;
   }
 
   private static long elapsedMillis(long startNanos) {
