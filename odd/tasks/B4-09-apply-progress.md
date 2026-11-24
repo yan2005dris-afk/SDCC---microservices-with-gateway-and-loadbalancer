@@ -57,3 +57,29 @@ Ejecutada sobre `a969dbe` / `4976ec8`:
   → confirma que los tests fijan de verdad el comportamiento y que `@NotNull` es lo que evita el
   `NullPointerException` → 500 del catch-all.
 - Los 13 tests preexistentes de `InventoryControllerTest` no fueron modificados.
+
+## Verificación `03-verify-odd` (2026-11-24 09:35) — PASS
+
+**Task completion:** A–G marcadas `[x]` en este apply-progress y en el DoD de la ODD. Archivos tocados por B4-09:
+`InventoryControllerTest.java` (+41 líneas, **0 deletions** → los 13 tests preexistentes intactos) y este
+apply-progress. Sin trabajo extra.
+
+**Cobertura de mutación (3 mutaciones ejecutadas, 4/4 tests nuevos muerden):**
+
+| Mutación | Resultado |
+|---|---|
+| Quitar `@NotNull` de `quantity` | `rejectsMissingQuantity` y `rejectsExplicitNullQuantity` → **400 esperado, 500 obtenido**; los otros 15 verdes |
+| Quitar `@NotBlank` de `productCode` | `rejectsMissingProductCode` → **400 esperado, 200 obtenido** (+ el preexistente `rejectsBlankProductCode`) |
+| `@Nullable` → `@NotBlank` en `orderNumber` | `requestWithoutOrderNumberDelegatesWithNullOrderNumber` → **200 esperado, 400 obtenido** |
+
+**Regresiones:** `inventory-service` 22 → **26** (17 controller + 9 service), 0 failures. Reactor **92 → 96**
+(gateway 7 · order 63 · inventory 26), BUILD SUCCESS.
+
+**Calidad:** `mvn -pl inventory-service verify` ✅ · `spotless:check` exit 0 ✅ · JUnit 5 + MockMvc + Mockito
+(convención del módulo) ✅ · cada test nuevo falla **un solo campo** (S4 determinista) ✅.
+
+**Commits:** `a969dbe test(inventory): cover DTO validation gaps` (formato convencional ✅, sin tags de IA ni
+co-author ✅) y `4976ec8 docs(odd): record B4-09 validation coverage` ✅.
+
+**Nota (no bloqueante):** las tareas A–E van en **un solo commit** porque las 5 tocan el mismo archivo y forman una
+única unidad de cobertura. Desviación de "un commit por tarea", aceptada y documentada.

@@ -118,15 +118,18 @@ Con `@NotNull` el bean validation corta **antes** del service y devuelve **400 P
 
 ## Definition of Done
 
-- [ ] Test `quantity` ausente → 400 ProblemDetail `"quantity es requerido"`
-- [ ] Test `quantity: null` → 400 ProblemDetail `"quantity es requerido"`
-- [ ] Test `productCode` ausente → 400 ProblemDetail `"productCode no puede estar vacío"`
-- [ ] Test sin `orderNumber` → 200 y `reserveStock("PROD-001", 5, null)`
-- [ ] Los 13 tests actuales de `InventoryControllerTest` siguen verdes **sin modificarlos**
-- [ ] `verifyNoInteractions(reservationService)` en los 3 casos de validación rechazada
-- [ ] Trazabilidad de B4-01 correcta (`14 → 21`, DoD marcado)
-- [ ] `mvn -pl inventory-service verify` pasa
-- [ ] `mvn -pl inventory-service spotless:check` pasa
+- [x] Test `quantity` ausente → 400 ProblemDetail `"quantity es requerido"`
+- [x] Test `quantity: null` → 400 ProblemDetail `"quantity es requerido"`
+- [x] Test `productCode` ausente → 400 ProblemDetail `"productCode no puede estar vacío"`
+- [x] Test sin `orderNumber` → 200 y `reserveStock("PROD-001", 5, null)`
+- [x] Los 13 tests actuales de `InventoryControllerTest` siguen verdes **sin modificarlos**
+- [x] `verifyNoInteractions(reservationService)` en los 3 casos de validación rechazada
+- [x] Trazabilidad de B4-01 correcta (`14 → 21`, DoD marcado)
+- [x] `mvn -pl inventory-service verify` pasa
+- [x] `mvn -pl inventory-service spotless:check` pasa
+
+> **DoD verificado 2026-11-24** por `03-verify-odd` → **PASS**. 4/4 tests nuevos con cobertura de mutación
+> probada por ejecución (ver `odd/archive/B4-09-apply-progress.md`, sección "Verificación independiente").
 
 ---
 
