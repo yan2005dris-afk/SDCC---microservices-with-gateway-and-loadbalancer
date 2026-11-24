@@ -256,3 +256,19 @@ no hay entidad, dominio ni contrato de API nuevo).
    cross-producto, release sin guard, check-then-insert) están **corregidos en el código**; lo que falta es la
    prueba y la documentación de la garantía.
 5. **H-4** — Actualizar `API_CONTRACT.md` en el rework de B4-07 (ya estaba pendiente por el FAIL de B4-03).
+
+
+## Cierre de los hallazgos (2026-11-24 12:20) — B4-11, B4-12 y B4-07 implementadas y verificadas
+
+| Hallazgo | Estado | Evidencia |
+|---|---|---|
+| H-1 — catch de `DataIntegrityViolationException` promete 200 con tx *rollback-only* | ✅ cerrado (B4-11, opción A) | `ON CONFLICT DO NOTHING` + movimiento antes del UPDATE; IT con Postgres real: `inserted == 0`, `rollbackOnly == false`, 2ª reserva `200` |
+| H-2 — guard `p.reservedStock >= :qty` sin test (mutante M1 sobrevivía) | ✅ cerrado (B4-11) | `releaseBelowReservedStockUpdatesNoRows`; M1 muere |
+| H-3 — 4 ITs skipped sin Docker | ✅ cerrado (B4-12) | 5 ITs ejecutados contra Postgres 15 real (0 skipped); CI con `mvn verify` y fallo explícito sin Postgres |
+| H-4 — contrato desactualizado | ✅ cerrado (B4-07, task E) | `API_CONTRACT.md` sección 3 reescrita contra las formas reales |
+
+Verificación global de esta sesión: `mvn -pl inventory-service verify` → 41 unit/slice + 5 ITs, BUILD SUCCESS;
+reactor 111 tests (gateway 7 · order 63 · inventory 41) en verde; `spotless:check` en verde.
+
+**B4-08 sigue en `odd/tasks/`** — su cierre (PASS limpio → `odd/archive/`) requiere la re-verificación
+`/03-verify-odd`; no se archiva por declaración propia.

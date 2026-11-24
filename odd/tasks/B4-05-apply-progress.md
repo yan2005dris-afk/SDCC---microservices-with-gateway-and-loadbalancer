@@ -141,3 +141,19 @@ Los tres hallazgos de este FAIL están **corregidos en el código** por el rewor
 
 **Rework:** `odd/tasks/B4-11-inventory-div-idempotence-guard.md`.
 **Cierre de B4-05:** cuando B4-11 cierre sus DoD y los ITs se hayan ejecutado en un entorno con Docker.
+
+
+## Cierre de los hallazgos (2026-11-24 12:20) — B4-11 y B4-12 implementadas y verificadas
+
+Los tres huecos que dejaron B4-05 abierto están **cerrados y verificados con Postgres real**:
+
+| Hallazgo | Estado | Evidencia |
+|---|---|---|
+| H-1 — el catch de `DataIntegrityViolationException` promete un 200 imposible (tx *rollback-only*) | ✅ corregido | Opción A: `ON CONFLICT DO NOTHING` (sin excepción) + movimiento insertado **antes** del UPDATE de stock; el IT `duplicateConflictInsertReturnsZeroWithoutRollbackOnlyAndRepeatReserveStaysIdempotent` comprueba `inserted == 0`, `rollbackOnly == false` y la reserva repetida en `200` con stock intacto |
+| H-2 — el guard `reservedStock >= :qty` sin test ejecutable (mutante M1 sobrevivía) | ✅ corregido | `releaseBelowReservedStockUpdatesNoRows` en el slice JPA; **M1 muere** |
+| H-3 — los ITs de Postgres nunca ejecutados (Docker caído) | ✅ corregido | 5 ITs ejecutados contra **Postgres 15 real** (0 skipped) en esta sesión; el CI corre `mvn verify` y el build **falla** en vez de omitir cuando no hay Postgres |
+
+Además: `mvn -pl inventory-service verify` → BUILD SUCCESS; reactor 111 tests en verde; `spotless:check` en verde.
+
+**B4-05 sigue en `odd/tasks/`** — su cierre (PASS limpio → `odd/archive/`) requiere la re-verificación
+`/03-verify-odd`; no se archiva por declaración propia.

@@ -88,20 +88,21 @@ sigue siendo 500 con `detail` genérico.
 
 ## Definition of Done
 
-- [ ] `ApiExceptionHandler` hereda de `ResponseEntityExceptionHandler`
-- [ ] `PUT /api/inventory/reserve` → 405 ProblemDetail
-- [ ] `POST /reserve` con `text/plain` → 415 ProblemDetail
-- [ ] Ruta sin mapping → 404 ProblemDetail
-- [ ] `POST /release` con `text/plain` → 415 ProblemDetail
-- [ ] Todas las respuestas de error con `application/problem+json`
-- [ ] Catch-all loguea la excepción; el body 500 sigue genérico
-- [ ] `detail` de los errores de negocio sin cambios (13 tests existentes verdes)
-- [ ] `docs/api-contracts/API_CONTRACT.md` — **sección 3 (inventory-service)** actualizada: `/reserve` con
+- [x] `ApiExceptionHandler` hereda de `ResponseEntityExceptionHandler`
+- [x] `PUT /api/inventory/reserve` → 405 ProblemDetail
+- [x] `POST /reserve` con `text/plain` → 415 ProblemDetail
+- [x] Ruta sin mapping → 404 ProblemDetail
+- [x] `POST /release` con `text/plain` → 415 ProblemDetail
+- [x] Todas las respuestas de error con `application/problem+json`
+- [x] Catch-all loguea la excepción; el body 500 sigue genérico
+- [x] `detail` de los errores de negocio sin cambios (13 tests existentes verdes)
+- [x] `docs/api-contracts/API_CONTRACT.md` — **sección 3 (inventory-service)** actualizada: `/reserve` con
       `remainingStock` + `unitPrice` + `productName`, `/release` con `orderNumber` + `releases[]`, `/stock` con
       `remainingStock`, y la tabla de errores con `application/problem+json` (400/404/405/409/415)
-- [ ] La **sección 2 (order-service)** queda **sin tocar** y marcada como no revisada en esta ODD
-- [ ] `mvn verify -pl inventory-service` pasa
-- [ ] `mvn spotless:check -pl inventory-service` pasa
+- [x] La **sección 2 (order-service)** queda **sin tocar** y marcada como no revisada en esta ODD
+- [x] Evidencia, batería de mutación y desviaciones en `odd/tasks/B4-07-apply-progress.md`
+- [x] `mvn verify -pl inventory-service` pasa
+- [x] `mvn spotless:check -pl inventory-service` pasa
 
 ---
 
@@ -168,6 +169,16 @@ JAVA_HOME=/usr/lib/jvm/java-21-openjdk mvn -pl inventory-service spotless:check
 ---
 
 ## Log
+
+**L3:** 2026-11-24 12:20 — ODD implementada y verificada. `ApiExceptionHandler` hereda de
+`ResponseEntityExceptionHandler`; sobrescribe `handleMethodArgumentNotValid`, `handleHttpMessageNotReadable` y
+`handleExceptionInternal` (sin duplicar `@ExceptionHandler`, para no producir un *ambiguous mapping*). El catch-all
+loguea la excepción completa y el body 500 sigue genérico. Verificado con ejecución real: `mvn -pl inventory-service
+verify` (41 unit/slice + **5 ITs contra Postgres 15 real**, 0 skipped), reactor completo (111 tests) y
+`spotless:check` en verde. Batería de mutación: al revertir el handler mueren 5 tests (405, 415 en `/reserve`,
+415 en `/release`, 404 sin mapping y el log del catch-all). Desviación documentada: el `400` de stock insuficiente
+conserva su cuerpo JSON plano (no `application/problem+json`) porque `order-service` lo deserializa en
+`InventoryReserveResponse`; queda en `API_CONTRACT.md` §3.5.
 
 **L2:** 2026-11-24 11:55 — Decisión del humano sobre W4: el contrato se actualiza **solo en la sección 3
 (inventory-service)**; la sección 2 (order-service) no se toca en esta ODD. Task E y DoD ampliados con la lista

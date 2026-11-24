@@ -69,3 +69,22 @@ Decisión del humano (2026-11-24): **opción A** — el 200 idempotente debe ser
 f72f540 test(inventory): cover postgres conflict-safe insert
 87470dc test(inventory): pin idempotency guard invariants
 ```
+
+
+## Re-verificación independiente (2026-11-24 12:20)
+
+Ejecutada de nuevo, con Docker **disponible**, sobre el árbol que incluye B4-07:
+
+```bash
+cd src
+JAVA_HOME=/usr/lib/jvm/java-21-openjdk mvn -pl inventory-service verify
+```
+
+- **BUILD SUCCESS** — 41 unit/slice (22 controller + 13 service + 6 JPA slice) + **5 ITs contra Postgres 15 real**
+  (`InventoryReservationIT`), 0 failures, 0 errors, **0 skipped**.
+- El camino de conflicto `ON CONFLICT DO NOTHING` queda validado con Postgres real: el insert duplicado devuelve
+  `0` filas, la transacción **no** queda *rollback-only* y la reserva repetida sigue en `200` con el stock intacto.
+- Reactor completo: **111 tests** (gateway 7 · order 63 · inventory 41), 0 failures.
+- `mvn -pl inventory-service spotless:check` en verde.
+
+La opción A queda **verificada en ejecución**, no solo por lectura de código.

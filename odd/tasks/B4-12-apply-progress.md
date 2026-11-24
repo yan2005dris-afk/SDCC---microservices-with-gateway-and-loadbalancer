@@ -55,3 +55,13 @@ f72f540 test(inventory): cover postgres conflict-safe insert
 Verificado con JDK 21: `mvn verify -pl inventory-service` (36 unit + 5 IT, 0 omitidos),
 `mvn -q spotless:check -pl inventory-service`, y `mvn test` en el reactor completo (106 tests:
 gateway 7, order 63, inventory 36).
+
+
+## Re-verificación independiente (2026-11-24 12:20)
+
+Con Docker disponible, `mvn -pl inventory-service verify` ejecutó los **5 ITs contra Postgres 15 real**
+(0 failures, 0 errors, **0 skipped**) y terminó en `BUILD SUCCESS`. El camino sin Docker ya no omite en
+silencio: el IT falla con el mensaje accionable que exige el DoD.
+
+Conteos tras B4-07: 41 unit/slice + 5 ITs en `inventory-service`; **111 tests** en el reactor completo
+(gateway 7 · order 63 · inventory 41); `spotless:check` en verde.

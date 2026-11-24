@@ -151,3 +151,21 @@ inventory 26), 0 failures. Los 17 tests del controller cubren los 13 previos + 4
 (Opción A: heredar de `ResponseEntityExceptionHandler` + sobrescribir `handleMethodArgumentNotValid`,
 `handleHttpMessageNotReadable` y `handleExceptionInternal`; tests 405/415/404 + `application/problem+json`;
 logging del catch-all; actualizar `API_CONTRACT.md`). La ODD de rework **sigue sin implementar**.
+
+
+## Cierre de los hallazgos (2026-11-24 12:20) — B4-07 implementada y verificada
+
+El rework `odd/tasks/B4-07-inventory-error-handling-fix.md` está **implementado y verificado con ejecución real**:
+
+| Gap de este FAIL | Estado | Evidencia |
+|---|---|---|
+| 405 / 415 / 404 devueltos como 500 | ✅ corregido | `ApiExceptionHandler` hereda de `ResponseEntityExceptionHandler`; `PUT /reserve` → **405**, `text/plain` → **415** en `/reserve` y `/release`, ruta sin mapping → **404**, todos `application/problem+json` |
+| El catch-all no loguea la causa raíz | ✅ corregido | `log.error("Error no controlado en {} {}", método, uri, excepción)`; test `unexpectedFailureLogsTheException` con `ListAppender` (nivel `ERROR` + `ThrowableProxy`) |
+| Ningún test cubría 405/415/404 | ✅ corregido | 5 tests nuevos en `InventoryControllerTest` + assert de `application/problem+json` en el helper |
+| `API_CONTRACT.md` §3 desactualizado | ✅ corregido | sección 3 reescrita (§3.1–§3.5) contra las formas reales; sección 2 sin tocar |
+
+Verificación: `mvn -pl inventory-service verify` → 41 unit/slice + 5 ITs con Postgres real, 0 skipped;
+reactor 111 tests en verde; `spotless:check` en verde. Batería de mutación: revertir el handler mata 5 tests.
+
+**B4-03 sigue en `odd/tasks/`** — su cierre (PASS limpio → `odd/archive/`) requiere la re-verificación
+`/03-verify-odd`; no se archiva por declaración propia.
