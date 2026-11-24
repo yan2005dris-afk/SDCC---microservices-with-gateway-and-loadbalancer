@@ -71,6 +71,3 @@ data/
 docs/architecture/.archify-*
 node_modules/
 package-lock.json
-
-# Local ODD workspace (task specs and apply-progress reports)
-odd/
