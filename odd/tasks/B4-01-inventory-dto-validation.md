@@ -1,0 +1,76 @@
+# ODD — B4-01: DTOs Tipados + Validación (INV-02)
+
+**Rama:** `brydyan/feature/inventory-reserve-hardening`  
+**Depende de:** Nada (primera)  
+**Bloquea:** B4-02, B4-03, B4-04, B4-05  
+**Responsable:** Andy
+
+---
+
+## Spec
+
+### S1 — ReserveStockRequest tipado y validado
+
+**Cambio:** De `Map<String, Object>` a DTO tipado.
+
+**Input (POST /api/inventory/reserve):**
+```json
+{
+  "productCode": "PROD-001",
+  "quantity": 5,
+  "orderNumber": "ORD-20250101-001"
+}
+```
+
+**DTO:**
+```java
+public record ReserveStockRequest(
+    @NotBlank(message = "productCode no puede estar vacío")
+    String productCode,
+    
+    @NotNull(message = "quantity es requerido")
+    @Positive(message = "quantity debe ser > 0")
+    Integer quantity,
+    
+    @Nullable
+    String orderNumber  // Para idempotencia (B5)
+) {}
+```
+
+**Validación (Framework):**
+- Jackson: rechaza type mismatch (`quantity: "abc"`, `quantity: 2.0`) → 400
+- `@NotBlank`, `@Positive` → 400 ProblemDetail si fallan
+
+**Hecho cuando:**
+- `POST /reserve quantity: "abc"` → 400 ProblemDetail (no 500)
+- `POST /reserve quantity: 2.0` → 400 ProblemDetail (no 500)
+- `POST /reserve quantity: -1` → 400 ProblemDetail (no 500)
+- `POST /reserve productCode: ""` → 400 ProblemDetail (no 400)
+
+---
+
+## Tasks
+
+| ID | Descripción | Archivo |
+|----|---|---|
+| A | Agregar `spring-boot-starter-validation` a `pom.xml` | `pom.xml` |
+| B | Crear `ReserveStockRequest` record con anotaciones | `dto/ReserveStockRequest.java` |
+| C | Crear excepciones de dominio: `ProductNotFoundException`, `StockUnavailableException` | `exception/ProductNotFoundException.java`, `exception/StockUnavailableException.java` |
+| D | Actualizar `InventoryController#reserveStock` para usar DTO | `controller/InventoryController.java` |
+
+---
+
+## Definition of Done
+
+- [ ] `pom.xml` incluye `spring-boot-starter-validation`
+- [ ] DTO creado con `@NotBlank`, `@NotNull`, `@Positive`
+- [ ] Excepciones de dominio creadas
+- [ ] Controller usa DTO, no `Map<String, Object>`
+- [ ] Tests unitarios pasan: validación type mismatch → 400
+- [ ] `mvn spotless:apply && mvn verify -pl inventory-service` pasa
+
+---
+
+## Log
+
+**L1:** 2026-11-23 23:30 — B4-01 creado. DTOs tipados + validación. Resuelve INV-02.
