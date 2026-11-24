@@ -1,7 +1,7 @@
 # ODD — B4-07: Corrección de semántica HTTP en el manejo de errores (INV-04 rework)
 
 **Rama:** `brydyan/feature/inventory-reserve-hardening`
-**Depende de:** B4-03 (`odd/tasks/B4-03-inventory-error-handling.md`)
+**Depende de:** B4-03 (`odd/archive/B4-03-inventory-error-handling.md`)
 **Bloquea:** B4-06
 **Responsable:** Andy
 
@@ -100,7 +100,7 @@ sigue siendo 500 con `detail` genérico.
       `remainingStock` + `unitPrice` + `productName`, `/release` con `orderNumber` + `releases[]`, `/stock` con
       `remainingStock`, y la tabla de errores con `application/problem+json` (400/404/405/409/415)
 - [x] La **sección 2 (order-service)** queda **sin tocar** y marcada como no revisada en esta ODD
-- [x] Evidencia, batería de mutación y desviaciones en `odd/tasks/B4-07-apply-progress.md`
+- [x] Evidencia, batería de mutación y desviaciones en `odd/archive/B4-07-apply-progress.md`
 - [x] `mvn verify -pl inventory-service` pasa
 - [x] `mvn spotless:check -pl inventory-service` pasa
 
@@ -170,7 +170,10 @@ JAVA_HOME=/usr/lib/jvm/java-21-openjdk mvn -pl inventory-service spotless:check
 
 ## Log
 
-**L3:** 2026-11-24 12:20 — ODD implementada y verificada. `ApiExceptionHandler` hereda de
+**L3:** 2026-11-24 12:45 — Verificación `03-verify-odd` de bloque: **PASS** (mutante `M16` muere: 5 tests).
+Evidencia completa en `odd/verification/B4-verification-2026-11-24.md`.
+
+**L2b:** 2026-11-24 12:20 — ODD implementada y verificada. `ApiExceptionHandler` hereda de
 `ResponseEntityExceptionHandler`; sobrescribe `handleMethodArgumentNotValid`, `handleHttpMessageNotReadable` y
 `handleExceptionInternal` (sin duplicar `@ExceptionHandler`, para no producir un *ambiguous mapping*). El catch-all
 loguea la excepción completa y el body 500 sigue genérico. Verificado con ejecución real: `mvn -pl inventory-service

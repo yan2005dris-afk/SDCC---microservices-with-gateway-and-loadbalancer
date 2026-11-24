@@ -2,7 +2,7 @@
 
 Rama: `brydyan/feature/inventory-reserve-hardening`
 Base: `098f26f`
-ODD: `odd/tasks/B4-12-inventory-postgres-integration-tests-ci.md`
+ODD: `odd/archive/B4-12-inventory-postgres-integration-tests-ci.md`
 Origen: WARN **W3** de la verificación `03-verify-odd` de B4-08 (2026-11-24 11:05)
 
 ## Tasks

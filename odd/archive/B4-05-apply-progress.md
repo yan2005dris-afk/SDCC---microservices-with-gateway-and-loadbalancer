@@ -108,8 +108,8 @@ Re-verificado contra HEAD con probes reales (esquema replicado del DDL de Postgr
 `reserved = -4` / `stock = 49` solo aparece si el constraint no está (o se cae). El defecto real es que
 `releaseAtomically` **no valida el invariante en la propia query** y el error sale como 500 en vez de 400.
 
-**Rework:** `odd/tasks/B4-08-inventory-idempotence-concurrency.md` — con errata obligatoria en
-`odd/tasks/B4-08-verification-errata.md` (la S1 actual reproduce el defecto y la S4 parte de una premisa
+**Rework:** `odd/archive/B4-08-inventory-idempotence-concurrency.md` — con errata obligatoria en
+`odd/archive/B4-08-verification-errata.md` (la S1 actual reproduce el defecto y la S4 parte de una premisa
 falsa: el constraint `CHECK` **sí existe** en `02-init-schemas.sql`).
 
 **Bonus (no bloqueante):** el índice único solo se crea al inicializar una BD **nueva**. Una BD ya inicializada
@@ -120,7 +120,7 @@ con el esquema viejo queda sin él → la idempotencia por `orderNumber` no est�
 ## Actualización (2026-11-24 11:05) — B4-08 cerrada en WARN, B4-05 sigue ABIERTA
 
 Los tres hallazgos de este FAIL están **corregidos en el código** por el rework B4-08
-(`odd/tasks/B4-08-inventory-idempotence-concurrency.md` + errata):
+(`odd/archive/B4-08-inventory-idempotence-concurrency.md` + errata):
 
 | Hallazgo original | Estado tras B4-08 | Evidencia |
 |---|---|---|
@@ -139,7 +139,7 @@ Los tres hallazgos de este FAIL están **corregidos en el código** por el rewor
   reales no están validados. → **B4-12** (ITs en CI con Testcontainers + el build falla, en vez de omitir, cuando no
   hay Postgres).
 
-**Rework:** `odd/tasks/B4-11-inventory-div-idempotence-guard.md`.
+**Rework:** `odd/archive/B4-11-inventory-div-idempotence-guard.md`.
 **Cierre de B4-05:** cuando B4-11 cierre sus DoD y los ITs se hayan ejecutado en un entorno con Docker.
 
 

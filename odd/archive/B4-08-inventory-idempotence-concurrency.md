@@ -106,7 +106,7 @@ Final: stock >= 0, reserved_stock >= 0 (invariantes mantenidas)
 ## Definition of Done
 
 > Estado tras la verificación `03-verify-odd` del 2026-11-24 11:05 (veredicto **WARN**).
-> La evidencia completa está en `odd/tasks/B4-08-apply-progress.md`.
+> La evidencia completa está en `odd/archive/B4-08-apply-progress.md`.
 > La S3 original ("50 threads reserve + release") fue **sustituida** por la errata E2.4: el camino real que
 > produce `reservedStock < 0` es **liberar más de lo reservado**, no la concurrencia simétrica.
 >
@@ -134,8 +134,15 @@ Final: stock >= 0, reserved_stock >= 0 (invariantes mantenidas)
 
 ## Log
 
+**L3:** 2026-11-24 12:45 — Verificación `03-verify-odd` de bloque: **PASS**. El WARN de esta ODD (H-1 a H-4) está
+cerrado: H-1 por la opción A de B4-11 (sin excepción, sin *rollback-only*), H-2 por el test de slice que mata el
+mutante `M1`, H-3 por los 5 ITs ejecutados contra Postgres 15 real (0 omitidos) y H-4 por la sección 3 del
+contrato reescrita en B4-07. La errata E1/E2.4 se aplicó: la idempotencia es por `(orderNumber, productCode)` y
+el camino de `reservedStock < 0` es liberar de más, no la concurrencia simétrica. Evidencia completa en
+`odd/verification/B4-verification-2026-11-24.md`.
+
 > ⚠️ **ERRATA OBLIGATORIA:** esta ODD fue corregida tras la re-verificación con probes contra el esquema real
-> de Postgres 15 (2026-11-24 09:10). Ver `odd/tasks/B4-08-verification-errata.md` **antes de implementar**:
+> de Postgres 15 (2026-11-24 09:10). Ver `odd/archive/B4-08-verification-errata.md` **antes de implementar**:
 > la S1 keyea la idempotencia solo por `orderNumber` (reproduce el defecto cross-producto), la S4 parte de la
 > premisa falsa de que el `CHECK (reserved_stock >= 0)` no existe (sí está en `02-init-schemas.sql`), y la S3
 > necesita manejar el `DataIntegrityViolationException` como 200 idempotente.

@@ -2,8 +2,8 @@
 
 Rama: `brydyan/feature/inventory-reserve-hardening`
 Base: `4e391d7`
-ODD: `odd/tasks/B4-08-inventory-idempotence-concurrency.md`
-Errata: `odd/tasks/B4-08-verification-errata.md`
+ODD: `odd/archive/B4-08-inventory-idempotence-concurrency.md`
+Errata: `odd/archive/B4-08-verification-errata.md`
 
 ## Tasks
 
@@ -237,7 +237,7 @@ ausencia está enmascarada por el lock de fila; (b) el guard del invariante de `
 en CI; (c) los ITs con Postgres no se ejecutaron en este entorno. Por eso **no** es FAIL y **no** se archiva
 todavía: queda pendiente cerrar H-1, H-2 y ejecutar los ITs con Docker.
 
-**Rework: `odd/tasks/B4-11-inventory-div-idempotence-guard.md`** (bug fix sobre feature existente → ODD, no SDD:
+**Rework: `odd/archive/B4-11-inventory-div-idempotence-guard.md`** (bug fix sobre feature existente → ODD, no SDD:
 no hay entidad, dominio ni contrato de API nuevo).
 
 ### 9. Recomendaciones

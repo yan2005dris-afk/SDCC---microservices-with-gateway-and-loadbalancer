@@ -75,10 +75,15 @@
 > convirtió 405/415/404 en **500** — una **regresión** frente a `eb27734` (pre-B4-03), donde esos códigos
 > eran correctos. Además el catch-all no loguea la causa raíz y `docs/api-contracts/API_CONTRACT.md` quedó
 > desactualizado.
-> **Rework obligatorio:** `odd/tasks/B4-07-inventory-error-handling-fix.md` (aún sin implementar).
+> **Rework obligatorio:** `odd/archive/B4-07-inventory-error-handling-fix.md` (aún sin implementar).
 
 ---
 
 ## Log
+
+**L3:** 2026-11-24 12:45 — Verificación `03-verify-odd` de bloque: **PASS**. El FAIL de esta ODD (405/415/404
+devueltos como 500, catch-all sin logging, contrato desactualizado) quedó cerrado por el rework B4-07, verificado
+por ejecución: el mutante `M16` (handler sin `ResponseEntityExceptionHandler`) mata 5 tests y el `detail` de los
+errores de negocio no cambió. Evidencia completa en `odd/verification/B4-verification-2026-11-24.md`.
 
 **L1:** 2026-11-23 23:38 — B4-03 creado. ProblemDetail + 404. Resuelve INV-04.

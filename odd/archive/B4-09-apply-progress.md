@@ -2,7 +2,7 @@
 
 Rama: `brydyan/feature/inventory-reserve-hardening`
 Base: `0cfe06b`
-ODD: `odd/tasks/B4-09-inventory-dto-validation-coverage.md`
+ODD: `odd/archive/B4-09-inventory-dto-validation-coverage.md`
 
 ## Tasks
 

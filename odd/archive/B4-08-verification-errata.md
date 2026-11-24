@@ -2,7 +2,7 @@
 
 **Fecha:** 2026-11-24 09:10
 **Autor:** verificación `03-verify-odd` (Mavis)
-**Aplica a:** `odd/tasks/B4-08-inventory-idempotence-concurrency.md`
+**Aplica a:** `odd/archive/B4-08-inventory-idempotence-concurrency.md`
 **Motivo:** la ODD B4-08 se escribió **antes** de la re-verificación con probes contra el esquema real de
 Postgres 15. Tres puntos de la ODD están mal planteados y, si se implementan tal cual, **el defecto se
 reproduce**.

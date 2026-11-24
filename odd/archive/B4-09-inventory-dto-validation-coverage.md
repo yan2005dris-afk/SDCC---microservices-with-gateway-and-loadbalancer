@@ -184,5 +184,11 @@ JAVA_HOME=/usr/lib/jvm/java-21-openjdk mvn -pl inventory-service spotless:check
 
 ## Log
 
+**L2b:** 2026-11-24 12:45 — Auditoría de regresión (verificación de bloque B4): la garantía de B4-09 **sigue en
+pie**. Única salvedad: la cláusula literal "los 13 tests actuales siguen verdes **sin modificarlos**" quedó
+obsoleta — B4-07 amplió el helper `expectProblemDetail` de `InventoryControllerTest` con el assert de
+`Content-Type: application/problem+json`. La semántica de validación que B4-09 fijó (`quantity` ausente/null,
+`productCode` ausente, determinismo del `detail`, `verifyNoInteractions`) está intacta y verificada.
+
 **L1:** 2026-11-24 08:55 — B4-09 creado. Cierra los 2 huecos del WARN de B4-01: falta el test de `@NotNull`
 (quantity ausente) y los números de test / DoD de la spec archivada de B4-01.

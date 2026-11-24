@@ -1,7 +1,7 @@
 # ODD — B4-11: Idempotencia real ante conflicto de índice (200 de verdad) + tests del guard de `release`
 
 **Rama:** `brydyan/feature/inventory-reserve-hardening`
-**Depende de:** B4-08 (`odd/tasks/B4-08-inventory-idempotence-concurrency.md`, verificado **WARN**), B4-10 (archivada, PASS)
+**Depende de:** B4-08 (`odd/archive/B4-08-inventory-idempotence-concurrency.md`, verificado **WARN**), B4-10 (archivada, PASS)
 **Coordinar con:** B4-12 (ITs con Postgres en CI) — **la verificación del camino de conflicto necesita el IT de Postgres**
 **Bloquea:** B4-06
 **Responsable:** Andy
@@ -236,20 +236,20 @@ conflicto coincida con el índice (columnas **y** predicado). Si el índice no f
 
 ## Definition of Done
 
-- [ ] Test de slice JPA: `releaseAtomically` con stock reservado insuficiente → 0 filas y fila intacta
-- [ ] Ese test **falla** si se quita el guard `p.reservedStock >= :qty` (mutante M1 muere)
-- [ ] Test que fija la serialización por lock de fila (mutante M10 muere)
-- [ ] Método de inserción con `ON CONFLICT (reference_order_number, movement_type, product_code) WHERE reference_order_number IS NOT NULL DO NOTHING`
-- [ ] El movimiento se inserta **antes** del UPDATE de stock, y en caso de conflicto **no** se toca el stock
-- [ ] Conflicto → **200** con el movimiento ganador, sin excepción y sin transacción *rollback-only*
-- [ ] Stock insuficiente → error de negocio de siempre y **ningún** movimiento insertado (rollback)
-- [ ] La cadena de garantías (lock → `ON CONFLICT` → índice único) está escrita en el código
-- [ ] IT de Postgres verifica el camino de conflicto (0 filas, sin excepción, 200, stock intacto) y corre en CI
-- [ ] `API_CONTRACT.md` (sección 3) sin cambios de forma: el contrato no cambia
-- [ ] Los 32 tests actuales de `inventory-service` siguen verdes
-- [ ] `mvn -pl inventory-service verify` pasa
-- [ ] `mvn -pl inventory-service spotless:check` pasa
-- [ ] Batería de mutaciones repetida: M1, M10 y M7 quedan cubiertos
+- [x] Test de slice JPA: `releaseAtomically` con stock reservado insuficiente → 0 filas y fila intacta
+- [x] Ese test **falla** si se quita el guard `p.reservedStock >= :qty` (mutante M1 muere)
+- [x] Test que fija la serialización por lock de fila (mutante M10 muere)
+- [x] Método de inserción con `ON CONFLICT (reference_order_number, movement_type, product_code) WHERE reference_order_number IS NOT NULL DO NOTHING`
+- [x] El movimiento se inserta **antes** del UPDATE de stock, y en caso de conflicto **no** se toca el stock
+- [x] Conflicto → **200** con el movimiento ganador, sin excepción y sin transacción *rollback-only*
+- [x] Stock insuficiente → error de negocio de siempre y **ningún** movimiento insertado (rollback)
+- [x] La cadena de garantías (lock → `ON CONFLICT` → índice único) está escrita en el código
+- [x] IT de Postgres verifica el camino de conflicto (0 filas, sin excepción, 200, stock intacto) y corre en CI
+- [x] `API_CONTRACT.md` (sección 3) sin cambios de forma: el contrato no cambia
+- [x] Los 32 tests actuales de `inventory-service` siguen verdes
+- [x] `mvn -pl inventory-service verify` pasa
+- [x] `mvn -pl inventory-service spotless:check` pasa
+- [x] Batería de mutaciones repetida: M1, M10 y M7 quedan cubiertos
 
 ---
 
@@ -325,6 +325,13 @@ JAVA_HOME=/usr/lib/jvm/java-21-openjdk mvn -pl inventory-service spotless:check
 ---
 
 ## Log
+
+**L3:** 2026-11-24 12:45 — Verificación `03-verify-odd` de bloque: **PASS**. La opción A quedó **verificada por
+ejecución**, no por lectura: el mutante `M14` (eliminar `ON CONFLICT DO NOTHING`) y el mutante `M15` (UPDATE de
+stock antes del INSERT del movimiento) **mueren** contra Postgres 15 real — el segundo es exactamente la
+sobreventa silenciosa que la ODD advertía. `M1`, `M7` y `M10` también mueren. El camino de conflicto devuelve 0
+filas sin marcar la transacción *rollback-only* y la reserva repetida sigue en 200 con el stock intacto.
+Evidencia completa en `odd/verification/B4-verification-2026-11-24.md`.
 
 **L1:** 2026-11-24 11:05 — B4-11 creado. Rework del WARN de B4-08: el catch de
 `DataIntegrityViolationException` promete un 200 que la transacción *rollback-only* no puede dar (evidencia P5a, P6,

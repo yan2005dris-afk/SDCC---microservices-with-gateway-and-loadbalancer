@@ -2,7 +2,7 @@
 
 Rama: `brydyan/feature/inventory-reserve-hardening`
 Base: `0b3aa12`
-ODD: `odd/tasks/B4-07-inventory-error-handling-fix.md`
+ODD: `odd/archive/B4-07-inventory-error-handling-fix.md`
 
 ## Tasks
 

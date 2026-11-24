@@ -125,15 +125,15 @@ test es un IT de Postgres.
 
 ## Definition of Done
 
-- [ ] `.github/workflows/ci-inventory-service.yml` corre `mvn verify` para `inventory-service`
-- [ ] El CI ejecuta y **exige** los 4 ITs de `InventoryReservationIT`
-- [ ] Sin Postgres disponible, la ejecución **falla** con mensaje explícito (no hay `skipped` silencioso)
-- [ ] El mensaje dice qué se necesita y cuál es el comando alternativo (`mvn test`) para el ciclo rápido
-- [ ] El IT de conflicto `ON CONFLICT` (B4-11) está escrito y corre en CI
-- [ ] La ruta local con/sin Docker está documentada
-- [ ] `mvn -pl inventory-service verify` pasa en un entorno con Docker
-- [ ] `mvn -pl inventory-service test` sigue pasando sin Docker (ciclo rápido)
-- [ ] `mvn -pl inventory-service spotless:check` pasa
+- [x] `.github/workflows/ci-inventory-service.yml` corre `mvn verify` para `inventory-service`
+- [x] El CI ejecuta y **exige** los 4 ITs de `InventoryReservationIT`
+- [x] Sin Postgres disponible, la ejecución **falla** con mensaje explícito (no hay `skipped` silencioso)
+- [x] El mensaje dice qué se necesita y cuál es el comando alternativo (`mvn test`) para el ciclo rápido
+- [x] El IT de conflicto `ON CONFLICT` (B4-11) está escrito y corre en CI
+- [x] La ruta local con/sin Docker está documentada
+- [x] `mvn -pl inventory-service verify` pasa en un entorno con Docker
+- [x] `mvn -pl inventory-service test` sigue pasando sin Docker (ciclo rápido)
+- [x] `mvn -pl inventory-service spotless:check` pasa
 
 ---
 
@@ -187,6 +187,13 @@ JAVA_HOME=/usr/lib/jvm/java-21-openjdk mvn -pl inventory-service spotless:check
 ---
 
 ## Log
+
+**L3:** 2026-11-24 12:45 — Verificación `03-verify-odd` de bloque: **PASS**. El comportamiento fail-fast se
+**ejercitó de verdad**: parcheando el chequeo de disponibilidad para simular "sin Postgres", `mvn verify` termina
+en `BUILD FAILURE` con el mensaje accionable (sin un solo `skipped`), mientras que `mvn test` (ciclo rápido)
+sigue en `BUILD SUCCESS` con 41 tests. El único ítem no verificable desde el entorno local es el paso de CI
+("`mvn verify` pasa en CI"), que depende de GitHub Actions. Evidencia completa en
+`odd/verification/B4-verification-2026-11-24.md`.
 
 **L1:** 2026-11-24 11:55 — B4-12 creado. Cierra el WARN W3 de la verificación de B4-08: los 4 ITs de PostgreSQL
 real nunca se ejecutaron (Docker caído → `skipped` silencioso) y el CI corre `mvn test`, que ni siquiera lanza

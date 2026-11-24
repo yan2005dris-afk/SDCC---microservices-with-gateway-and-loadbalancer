@@ -2,7 +2,7 @@
 
 Rama: `brydyan/feature/inventory-reserve-hardening`
 Base: `ad35a14`
-ODD: `odd/tasks/B4-10-inventory-atomic-reserve-durability.md`
+ODD: `odd/archive/B4-10-inventory-atomic-reserve-durability.md`
 
 ## Tasks
 
@@ -144,5 +144,5 @@ el código, y el gap 3 (suite solo-mock) tiene ahora slice JPA contra una base r
 **Se archiva en `odd/archive/`.**
 
 Nota: el gap residual M7 (equivalencia del `flushAutomatically`) y el hecho de que los ITs con Postgres sigan
-`skipped` **no** son de B4-10: el primero ya está rastreado en `odd/tasks/B4-11-inventory-div-idempotence-guard.md`
+`skipped` **no** son de B4-10: el primero ya está rastreado en `odd/archive/B4-11-inventory-div-idempotence-guard.md`
 y el segundo es tarea de entorno, de B4-06/B4-08.

@@ -76,7 +76,7 @@ Causa: `@ExceptionHandler(Exception.class)` captura también las excepciones est
 Otros hallazgos: el catch-all no loguea la causa raíz; ningún test cubre 405/415/404 ni el
 `Content-Type: application/problem+json`; `docs/api-contracts/API_CONTRACT.md` quedó desactualizado.
 
-**Rework:** `odd/tasks/B4-07-inventory-error-handling-fix.md` (Opción A: heredar de
+**Rework:** `odd/archive/B4-07-inventory-error-handling-fix.md` (Opción A: heredar de
 `ResponseEntityExceptionHandler`). B4-03 permanece abierta hasta que B4-07 cierre.
 
 ### Re-verificación (2026-11-24 09:10)
@@ -90,7 +90,7 @@ B4-03 PUT reserve=500 (esperado 405) | POST text/plain=500 (esperado 415)
 
 El FAIL **sigue reproduciéndose** en HEAD. Se agrega el 4º caso (`POST /api/inventory/release` con
 `text/plain` → 500, esperado 415), que no estaba en la primera tabla de evidencia y ya está cubierto por la
-tarea D de `odd/tasks/B4-07-inventory-error-handling-fix.md`.
+tarea D de `odd/archive/B4-07-inventory-error-handling-fix.md`.
 
 ---
 
@@ -147,7 +147,7 @@ Causa: `@ExceptionHandler(Exception.class)` captura también las excepciones est
 `inventory-service` 22 → **26** (17 controller + 9 service) · reactor **92 → 96** (gateway 7 · order 63 ·
 inventory 26), 0 failures. Los 17 tests del controller cubren los 13 previos + 4 de B4-09, ninguno roto.
 
-**Veredicto: ❌ FAIL — B4-03 permanece abierta.** El rework es `odd/tasks/B4-07-inventory-error-handling-fix.md`
+**Veredicto: ❌ FAIL — B4-03 permanece abierta.** El rework es `odd/archive/B4-07-inventory-error-handling-fix.md`
 (Opción A: heredar de `ResponseEntityExceptionHandler` + sobrescribir `handleMethodArgumentNotValid`,
 `handleHttpMessageNotReadable` y `handleExceptionInternal`; tests 405/415/404 + `application/problem+json`;
 logging del catch-all; actualizar `API_CONTRACT.md`). La ODD de rework **sigue sin implementar**.
@@ -155,7 +155,7 @@ logging del catch-all; actualizar `API_CONTRACT.md`). La ODD de rework **sigue s
 
 ## Cierre de los hallazgos (2026-11-24 12:20) — B4-07 implementada y verificada
 
-El rework `odd/tasks/B4-07-inventory-error-handling-fix.md` está **implementado y verificado con ejecución real**:
+El rework `odd/archive/B4-07-inventory-error-handling-fix.md` está **implementado y verificado con ejecución real**:
 
 | Gap de este FAIL | Estado | Evidencia |
 |---|---|---|

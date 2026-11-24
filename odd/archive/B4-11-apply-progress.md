@@ -2,9 +2,9 @@
 
 Rama: `brydyan/feature/inventory-reserve-hardening`
 Base: `bd9cc0a`
-ODD: `odd/tasks/B4-11-inventory-div-idempotence-guard.md`
+ODD: `odd/archive/B4-11-inventory-div-idempotence-guard.md`
 Origen: WARN de la verificación `03-verify-odd` de B4-08 (2026-11-24 11:05)
-Coordinado con: `odd/tasks/B4-12-inventory-postgres-integration-tests-ci.md` (los ITs con Postgres)
+Coordinado con: `odd/archive/B4-12-inventory-postgres-integration-tests-ci.md` (los ITs con Postgres)
 Decisión del humano (2026-11-24): **opción A** — el 200 idempotente debe ser real, vía `ON CONFLICT DO NOTHING`
 
 ## Tasks
