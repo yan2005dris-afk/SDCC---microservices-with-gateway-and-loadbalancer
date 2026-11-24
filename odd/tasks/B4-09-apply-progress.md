@@ -46,3 +46,14 @@ ODD: `odd/tasks/B4-09-inventory-dto-validation-coverage.md`
 ```
 a969dbe test(inventory): cover DTO validation gaps
 ```
+
+## Verificación independiente (`03-verify-odd`, 2026-11-24 09:12)
+
+Ejecutada sobre `a969dbe` / `4976ec8`:
+
+- `mvn -pl inventory-service test` → **26 tests verdes** (17 controller = 13 previos + 4 nuevos, 9 service).
+- **Mutación:** quitando `@NotNull` del DTO en una copia temporal, los 2 tests nuevos fallan con
+  `Response status expected:<400> but was:<500>` y los otros 15 siguen verdes.
+  → confirma que los tests fijan de verdad el comportamiento y que `@NotNull` es lo que evita el
+  `NullPointerException` → 500 del catch-all.
+- Los 13 tests preexistentes de `InventoryControllerTest` no fueron modificados.
