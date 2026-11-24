@@ -219,7 +219,8 @@ que hoy queda `skipped`. Si alguien quita el guard, **CI sigue verde**. → **B4
 
 **H-3 — El IT de `reserve` concurrente no se ejecutó.** Los 4 ITs quedaron `skipped` por falta de Docker. La
 evidencia equivalente se obtuvo con H2 (P2, P4) y es consistente, pero el `FOR UPDATE` de Postgres y el `CHECK`
-real solo se validan en el entorno con Docker.
+real solo se validan en el entorno con Docker. → **B4-12** (ITs en CI con Testcontainers + build que falla, en vez
+de omitir, cuando no hay Postgres).
 
 **H-4 — La respuesta de `/release` cambió de forma (aditiva).** Ahora devuelve `orderNumber` y `releases[]`
 además de `productCode`/`quantity`/`message`. No rompe a `order-service` (que no consume `/release`), pero
@@ -247,8 +248,10 @@ no hay entidad, dominio ni contrato de API nuevo).
    seguir es un catch que promete 200 y entrega 500.
 2. **B4-11 / H-2** — Añadir el test de slice JPA que fija el guard `p.reservedStock >= :qty` (mutante M1) y el
    test que fija el catch de DIV de `release` (mutante M10).
-3. **H-3** — Ejecutar los 4 ITs en un entorno con Docker (o en CI con Postgres como servicio) antes de declarar
-   B4-08 y B4-05 QA-ready. Sin eso, la protección del `CHECK` real y del `FOR UPDATE` de Postgres no está probada.
+3. **H-3** — Ejecutar los 4 ITs en un entorno con Docker. Resuelto por **B4-12**: el CI pasa a `mvn verify` (con
+   Testcontainers, `ubuntu-latest` ya tiene Docker) y el build **falla con mensaje explícito** si no hay Postgres,
+   en vez de omitir los tests en silencio. Sin eso, la protección del `CHECK` real y del `FOR UPDATE` de Postgres
+   no está probada.
 4. **B4-05 sigue abierta** hasta que se cierren H-1, H-2 y H-3. Los tres hallazgos originales de B4-05 (idempotencia
    cross-producto, release sin guard, check-then-insert) están **corregidos en el código**; lo que falta es la
    prueba y la documentación de la garantía.

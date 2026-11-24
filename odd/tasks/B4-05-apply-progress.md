@@ -136,7 +136,8 @@ Los tres hallazgos de este FAIL están **corregidos en el código** por el rewor
 - **H-2** — el guard del invariante de `release` no tiene ninguna prueba ejecutable que lo proteja (mutante M1
   sobrevive): solo lo cubre el IT de Postgres, que queda `skipped` sin Docker → **B4-11**.
 - **H-3** — los 4 ITs de Postgres nunca se han ejecutado (daemon de Docker caído): el `FOR UPDATE` y el `CHECK`
-  reales no están validados.
+  reales no están validados. → **B4-12** (ITs en CI con Testcontainers + el build falla, en vez de omitir, cuando no
+  hay Postgres).
 
 **Rework:** `odd/tasks/B4-11-inventory-div-idempotence-guard.md`.
 **Cierre de B4-05:** cuando B4-11 cierre sus DoD y los ITs se hayan ejecutado en un entorno con Docker.

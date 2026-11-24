@@ -81,7 +81,7 @@ sigue siendo 500 con `detail` genérico.
 | B | Sobrescribir `handleMethodArgumentNotValid`, `handleHttpMessageNotReadable` y `handleExceptionInternal` (sin duplicar `@ExceptionHandler`) | `web/ApiExceptionHandler.java` |
 | C | Mantener handlers de dominio (404 / 400 custom) y catch-all con `log.error(..., exception)` | `web/ApiExceptionHandler.java` |
 | D | Tests: 405, 415, 404 sin mapping, 415 en `/release` + assert de `application/problem+json` | `src/test/java/.../InventoryControllerTest.java` |
-| E | Actualizar `docs/api-contracts/API_CONTRACT.md` (404, ProblemDetail, bodies actuales) | `docs/api-contracts/API_CONTRACT.md` |
+| E | Actualizar `docs/api-contracts/API_CONTRACT.md` — **solo la sección 3 (inventory-service)**: `/reserve` (body con `remainingStock`, `unitPrice`, `productName`), `/release` (body con `orderNumber` y `releases[]`), `/stock` (con `remainingStock`), y la tabla de errores (400/404/405/409/415 con `application/problem+json`) | `docs/api-contracts/API_CONTRACT.md` |
 | F | Verificación: `mvn verify -pl inventory-service` + `spotless:check` | — |
 
 ---
@@ -96,7 +96,10 @@ sigue siendo 500 con `detail` genérico.
 - [ ] Todas las respuestas de error con `application/problem+json`
 - [ ] Catch-all loguea la excepción; el body 500 sigue genérico
 - [ ] `detail` de los errores de negocio sin cambios (13 tests existentes verdes)
-- [ ] `docs/api-contracts/API_CONTRACT.md` actualizado
+- [ ] `docs/api-contracts/API_CONTRACT.md` — **sección 3 (inventory-service)** actualizada: `/reserve` con
+      `remainingStock` + `unitPrice` + `productName`, `/release` con `orderNumber` + `releases[]`, `/stock` con
+      `remainingStock`, y la tabla de errores con `application/problem+json` (400/404/405/409/415)
+- [ ] La **sección 2 (order-service)** queda **sin tocar** y marcada como no revisada en esta ODD
 - [ ] `mvn verify -pl inventory-service` pasa
 - [ ] `mvn spotless:check -pl inventory-service` pasa
 
@@ -165,6 +168,11 @@ JAVA_HOME=/usr/lib/jvm/java-21-openjdk mvn -pl inventory-service spotless:check
 ---
 
 ## Log
+
+**L2:** 2026-11-24 11:55 — Decisión del humano sobre W4: el contrato se actualiza **solo en la sección 3
+(inventory-service)**; la sección 2 (order-service) no se toca en esta ODD. Task E y DoD ampliados con la lista
+explícita de lo que debe quedar reflected: bodies de `/reserve`, `/release` y `/stock`, más la tabla de errores con
+`application/problem+json` y los códigos 400/404/405/409/415.
 
 **L1:** 2026-11-24 08:44 — B4-07 creado. Rework de B4-03 tras FAIL de verificación: 405/415/404
 devueltos como 500 por el catch-all, sin logging y sin tests que lo detecten.
