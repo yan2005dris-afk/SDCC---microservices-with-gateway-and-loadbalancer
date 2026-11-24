@@ -75,6 +75,12 @@ Gestiona pedidos con 2 instancias balanceadas. Contiene el enrutamiento de lectu
 - **Problema:** el stock se descuenta en inventario antes de guardar el pedido. Si el `save` en el primario falla, el stock queda reservado sin pedido asociado.
 - **Nota:** la consigna dice *"No se exige implementar Sagas ni transacciones distribuidas"*. Basta con **documentarlo como limitación** en el informe y en el video. Mejora opcional: llamar a un endpoint `release` (INV-06) en el bloque `catch`.
 
+#### 🔴 ORD-09 — Una réplica caída sacaba del tráfico a todas las instancias (detectado durante B2)
+- **Dónde:** `management` en `order-service` e `inventory-service`; health check del LoadBalancer del Gateway; healthchecks de Compose y Swarm.
+- **Causa:** `/actuator/health` incluye el indicador `db` con todos los DataSource, réplicas incluidas. Al caer una réplica, las dos instancias de `order-service` pasaban a `DOWN`, el Gateway las retiraba y respondía 503. En Swarm, las tareas `unhealthy` se reemplazan: habría causado reinicios en bucle.
+- **Solución:** el tráfico se decide con `/actuator/health/readiness` (probes de Spring Boot), que no depende de recursos compartidos. `/actuator/health` conserva el detalle de la BD para diagnóstico.
+- **Estado:** resuelto en `refactor/order-read-routing` (B2).
+
 #### 🟠 ORD-08 — Faltan tests de integración
 - **Problema:** AGENTS.md exige tests unitarios + de integración en CI, y solo existen tests unitarios con mocks.
 - **Solución propuesta:** test con Testcontainers (PostgreSQL) que verifique el enrutamiento `PRIMARY`/`REPLICA_*` y el failover con transacciones reales. Este test habría detectado ORD-01.
