@@ -5,7 +5,6 @@ import com.distribuidos.inventory.exception.ProductNotFoundException;
 import com.distribuidos.inventory.repository.InventoryProductRepository;
 import com.distribuidos.inventory.service.InventoryReservationService;
 import jakarta.validation.Valid;
-import java.util.Map;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -37,17 +36,8 @@ public class InventoryController {
 
   @PostMapping("/reserve")
   public ResponseEntity<?> reserveStock(@Valid @RequestBody ReserveStockRequest request) {
-    int remainingStock = reservationService.reserveStock(request.productCode(), request.quantity());
-
     return ResponseEntity.ok()
         .header("X-Instance-Id", instanceId)
-        .body(
-            Map.of(
-                "productCode",
-                request.productCode(),
-                "available",
-                true,
-                "remainingStock",
-                remainingStock));
+        .body(reservationService.reserveStock(request.productCode(), request.quantity()));
   }
 }

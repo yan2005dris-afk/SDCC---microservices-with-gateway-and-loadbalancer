@@ -8,10 +8,12 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.distribuidos.inventory.dto.ReservationResponse;
 import com.distribuidos.inventory.exception.ProductNotFoundException;
 import com.distribuidos.inventory.exception.StockUnavailableException;
 import com.distribuidos.inventory.model.InventoryProduct;
 import com.distribuidos.inventory.repository.InventoryProductRepository;
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -37,9 +39,14 @@ class InventoryReservationServiceTest {
     when(repository.reserveAtomically("PROD-001", 5)).thenReturn(1);
     when(repository.findByProductCode("PROD-001")).thenReturn(Optional.of(product(45)));
 
-    int remaining = service().reserveStock("PROD-001", 5);
+    ReservationResponse response = service().reserveStock("PROD-001", 5);
 
-    assertThat(remaining).isEqualTo(45);
+    assertThat(response.productCode()).isEqualTo("PROD-001");
+    assertThat(response.available()).isTrue();
+    assertThat(response.remainingStock()).isEqualTo(45);
+    assertThat(response.unitPrice()).isEqualByComparingTo("1899.99");
+    assertThat(response.productName()).isEqualTo("Laptop Dell XPS 15");
+    assertThat(response.message()).isEqualTo("Reserva confirmada");
     verify(repository).reserveAtomically("PROD-001", 5);
     verify(repository, never()).save(any());
   }
@@ -78,7 +85,7 @@ class InventoryReservationServiceTest {
 
     ExecutorService pool = Executors.newFixedThreadPool(20);
     CountDownLatch start = new CountDownLatch(1);
-    List<Future<Integer>> futures = new ArrayList<>();
+    List<Future<ReservationResponse>> futures = new ArrayList<>();
     try {
       for (int i = 0; i < 20; i++) {
         futures.add(
@@ -90,8 +97,8 @@ class InventoryReservationServiceTest {
       }
       start.countDown();
 
-      for (Future<Integer> future : futures) {
-        assertThat(future.get(10, TimeUnit.SECONDS)).isGreaterThanOrEqualTo(0);
+      for (Future<ReservationResponse> future : futures) {
+        assertThat(future.get(10, TimeUnit.SECONDS).remainingStock()).isGreaterThanOrEqualTo(0);
       }
       assertThat(futures).hasSize(20);
       assertThat(stock.get()).isZero();
@@ -110,6 +117,8 @@ class InventoryReservationServiceTest {
     product.setProductCode("PROD-001");
     product.setStock(stock);
     product.setReservedStock(0);
+    product.setName("Laptop Dell XPS 15");
+    product.setUnitPrice(new BigDecimal("1899.99"));
     return product;
   }
 }
