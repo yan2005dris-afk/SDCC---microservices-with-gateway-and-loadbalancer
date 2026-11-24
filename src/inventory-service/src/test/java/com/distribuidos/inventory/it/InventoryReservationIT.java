@@ -21,13 +21,23 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.testcontainers.DockerClientFactory;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
-@Testcontainers(disabledWithoutDocker = true)
+@Testcontainers
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 class InventoryReservationIT {
+
+  private static final String POSTGRES_REQUIREMENT_MESSAGE =
+      "Los tests de integración de inventory-service requieren un PostgreSQL real "
+          + "(Docker en ejecución o un Postgres accesible). "
+          + "Para el ciclo rápido sin Docker usa: mvn test -pl inventory-service";
+
+  static {
+    requirePostgres();
+  }
 
   @Container
   static PostgreSQLContainer<?> postgres =
@@ -36,6 +46,12 @@ class InventoryReservationIT {
           .withUsername("inventory")
           .withPassword("inventory")
           .withInitScript("inventory-schema.sql");
+
+  private static void requirePostgres() {
+    if (!DockerClientFactory.instance().isDockerAvailable()) {
+      throw new IllegalStateException(POSTGRES_REQUIREMENT_MESSAGE);
+    }
+  }
 
   @DynamicPropertySource
   static void datasourceProperties(DynamicPropertyRegistry registry) {
