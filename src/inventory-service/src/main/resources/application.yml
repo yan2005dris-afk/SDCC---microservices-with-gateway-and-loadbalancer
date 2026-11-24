@@ -1,9 +1,13 @@
 server:
   port: ${SERVER_PORT:8082}
+  # Apagado ordenado: termina las reservas de stock en curso antes de cerrar.
+  shutdown: graceful
 
 spring:
   application:
     name: inventory-service
+  lifecycle:
+    timeout-per-shutdown-phase: 20s
   datasource:
     url: ${DB_URL:jdbc:postgresql://localhost:5432/inventory_db}
     username: ${DB_USER:admin}
@@ -38,3 +42,9 @@ management:
   endpoint:
     health:
       show-details: always
+      # /actuator/health/readiness decide si la instancia recibe tráfico (Gateway y Docker).
+      # No incluye la BD a propósito: primario y réplicas son compartidos por todas las
+      # instancias, y si su caída marcara DOWN a todas, una réplica caída cortaría el
+      # servicio completo (fallo en cascada). /actuator/health sigue mostrando la BD.
+      probes:
+        enabled: true

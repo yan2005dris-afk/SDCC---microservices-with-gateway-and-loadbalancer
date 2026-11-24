@@ -30,6 +30,10 @@
         <spring-cloud.version>2024.0.0</spring-cloud.version>
         <spotless.version>2.44.3</spotless.version>
         <maven-checkstyle-plugin.version>3.6.0</maven-checkstyle-plugin.version>
+        <!-- Spring Boot 3.4.3 trae Testcontainers 1.20.5, que habla con Docker usando la
+             API 1.32. Docker 29 (el de los runners de GitHub Actions) la rechaza con
+             "client version 1.32 is too old"; 1.21.4 negocia una versión compatible. -->
+        <testcontainers.version>1.21.4</testcontainers.version>
     </properties>
 
     <dependencyManagement>
