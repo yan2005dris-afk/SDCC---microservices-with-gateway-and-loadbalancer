@@ -1,7 +1,11 @@
 package com.distribuidos.inventory.controller;
 
+import com.distribuidos.inventory.dto.ReserveStockRequest;
+import com.distribuidos.inventory.exception.ProductNotFoundException;
+import com.distribuidos.inventory.exception.StockUnavailableException;
 import com.distribuidos.inventory.model.InventoryProduct;
 import com.distribuidos.inventory.repository.InventoryProductRepository;
+import jakarta.validation.Valid;
 import java.util.Map;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
@@ -32,30 +36,18 @@ public class InventoryController {
 
   @PostMapping("/reserve")
   @Transactional
-  public ResponseEntity<?> reserveStock(@RequestBody Map<String, Object> request) {
-    String productCode = (String) request.get("productCode");
-    Integer quantity = (Integer) request.get("quantity");
-
-    if (productCode == null || quantity == null || quantity <= 0) {
-      return ResponseEntity.badRequest().body(Map.of("error", "Parámetros inválidos"));
-    }
+  public ResponseEntity<?> reserveStock(@Valid @RequestBody ReserveStockRequest request) {
+    String productCode = request.productCode();
+    Integer quantity = request.quantity();
 
     var productOpt = repository.findByProductCode(productCode);
     if (productOpt.isEmpty()) {
-      return ResponseEntity.badRequest().body(Map.of("error", "Producto no encontrado"));
+      throw new ProductNotFoundException(productCode);
     }
 
     InventoryProduct product = productOpt.get();
     if (product.getStock() < quantity) {
-      return ResponseEntity.badRequest()
-          .body(
-              Map.of(
-                  "available",
-                  false,
-                  "error",
-                  "Stock insuficiente",
-                  "currentStock",
-                  product.getStock()));
+      throw new StockUnavailableException(productCode, product.getStock());
     }
 
     product.setStock(product.getStock() - quantity);

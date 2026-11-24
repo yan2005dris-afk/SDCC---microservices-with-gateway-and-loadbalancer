@@ -13,6 +13,9 @@ spring:
     username: ${DB_USER:admin}
     password: ${DB_PASSWORD:admin_demo_change_me}
     driver-class-name: org.postgresql.Driver
+  jackson:
+    deserialization:
+      accept-float-as-int: false
   jpa:
     hibernate:
       ddl-auto: update
