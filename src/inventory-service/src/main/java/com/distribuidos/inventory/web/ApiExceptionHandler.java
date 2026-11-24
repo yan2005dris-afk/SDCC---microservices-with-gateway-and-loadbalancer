@@ -58,6 +58,12 @@ public class ApiExceptionHandler {
                 exception.getMessage()));
   }
 
+  @ExceptionHandler(Exception.class)
+  ResponseEntity<ProblemDetail> handleUnexpected(Exception exception, HttpServletRequest request) {
+    return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+        .body(problem(HttpStatus.INTERNAL_SERVER_ERROR, "Error interno del servidor", request));
+  }
+
   private ProblemDetail problem(HttpStatus status, String detail, HttpServletRequest request) {
     ProblemDetail problem = ProblemDetail.forStatusAndDetail(status, detail);
     problem.setInstance(URI.create(request.getRequestURI()));
