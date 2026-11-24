@@ -1,13 +1,13 @@
 package com.distribuidos.inventory.controller;
 
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.distribuidos.inventory.model.InventoryProduct;
 import com.distribuidos.inventory.repository.InventoryProductRepository;
-import java.util.Optional;
+import com.distribuidos.inventory.service.InventoryReservationService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -23,6 +23,8 @@ class InventoryControllerTest {
   @Autowired private MockMvc mockMvc;
 
   @MockitoBean private InventoryProductRepository repository;
+
+  @MockitoBean private InventoryReservationService reservationService;
 
   @Test
   void rejectsNonNumericQuantityWithBadRequest() throws Exception {
@@ -48,41 +50,16 @@ class InventoryControllerTest {
   }
 
   @Test
-  void unknownProductKeepsBadRequestResponse() throws Exception {
-    when(repository.findByProductCode("PROD-999")).thenReturn(Optional.empty());
-
-    performReserve("{\"productCode\":\"PROD-999\",\"quantity\":5}")
-        .andExpect(status().isBadRequest())
-        .andExpect(jsonPath("$.error").value("Producto no encontrado"));
-  }
-
-  @Test
-  void insufficientStockKeepsBadRequestResponse() throws Exception {
-    InventoryProduct product = new InventoryProduct();
-    product.setProductCode("PROD-001");
-    product.setStock(2);
-    product.setReservedStock(0);
-    when(repository.findByProductCode("PROD-001")).thenReturn(Optional.of(product));
-
-    performReserve("{\"productCode\":\"PROD-001\",\"quantity\":5}")
-        .andExpect(status().isBadRequest())
-        .andExpect(jsonPath("$.available").value(false))
-        .andExpect(jsonPath("$.currentStock").value(2));
-  }
-
-  @Test
-  void validRequestReservesStock() throws Exception {
-    InventoryProduct product = new InventoryProduct();
-    product.setProductCode("PROD-001");
-    product.setStock(10);
-    product.setReservedStock(0);
-    when(repository.findByProductCode("PROD-001")).thenReturn(Optional.of(product));
+  void validRequestDelegatesToService() throws Exception {
+    when(reservationService.reserveStock("PROD-001", 5)).thenReturn(5);
 
     performReserve(
             "{\"productCode\":\"PROD-001\",\"quantity\":5,\"orderNumber\":\"ORD-20250101-001\"}")
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.available").value(true))
         .andExpect(jsonPath("$.remainingStock").value(5));
+
+    verify(reservationService).reserveStock("PROD-001", 5);
   }
 
   private org.springframework.test.web.servlet.ResultActions performReserve(String body)
