@@ -1,23 +1,32 @@
 package com.distribuidos.inventory.controller;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import com.distribuidos.inventory.dto.ReservationResponse;
 import com.distribuidos.inventory.exception.ProductNotFoundException;
 import com.distribuidos.inventory.exception.ReservationNotFoundException;
 import com.distribuidos.inventory.exception.StockUnavailableException;
 import com.distribuidos.inventory.repository.InventoryProductRepository;
 import com.distribuidos.inventory.service.InventoryReservationService;
+import com.distribuidos.inventory.web.ApiExceptionHandler;
 import java.math.BigDecimal;
 import java.util.Map;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.http.MediaType;
@@ -230,6 +239,73 @@ class InventoryControllerTest {
         RESERVE_URL);
   }
 
+  @Test
+  void putOnReserveReturns405ProblemDetail() throws Exception {
+    expectProblemDetail(
+        mockMvc.perform(put(RESERVE_URL).contentType(MediaType.APPLICATION_JSON).content("{}")),
+        405,
+        "Method Not Allowed",
+        "Method 'PUT' is not supported.",
+        RESERVE_URL);
+  }
+
+  @Test
+  void unsupportedMediaTypeOnReserveReturns415ProblemDetail() throws Exception {
+    expectProblemDetail(
+        mockMvc.perform(post(RESERVE_URL).contentType(MediaType.TEXT_PLAIN).content("not-a-json")),
+        415,
+        "Unsupported Media Type",
+        "Content-Type 'text/plain;charset=UTF-8' is not supported.",
+        RESERVE_URL);
+  }
+
+  @Test
+  void unsupportedMediaTypeOnReleaseReturns415ProblemDetail() throws Exception {
+    expectProblemDetail(
+        mockMvc.perform(post(RELEASE_URL).contentType(MediaType.TEXT_PLAIN).content("not-a-json")),
+        415,
+        "Unsupported Media Type",
+        "Content-Type 'text/plain;charset=UTF-8' is not supported.",
+        RELEASE_URL);
+  }
+
+  @Test
+  void unmappedPathReturns404ProblemDetail() throws Exception {
+    expectProblemDetail(
+        mockMvc.perform(get("/api/inventory/a/b")), 404, "Not Found", null, "/api/inventory/a/b");
+  }
+
+  @Test
+  void unexpectedFailureLogsTheException() throws Exception {
+    Logger logger = (Logger) LoggerFactory.getLogger(ApiExceptionHandler.class);
+    ListAppender<ILoggingEvent> appender = new ListAppender<>();
+    appender.start();
+    logger.addAppender(appender);
+    try {
+      when(reservationService.reserveStock("PROD-001", 1, null))
+          .thenThrow(new IllegalStateException("boom"));
+
+      mockMvc
+          .perform(
+              post(RESERVE_URL)
+                  .contentType(MediaType.APPLICATION_JSON)
+                  .content("{\"productCode\":\"PROD-001\",\"quantity\":1}"))
+          .andExpect(status().isInternalServerError());
+
+      assertThat(appender.list)
+          .anySatisfy(
+              event -> {
+                assertThat(event.getLevel()).isEqualTo(Level.ERROR);
+                assertThat(event.getThrowableProxy()).isNotNull();
+                assertThat(event.getThrowableProxy().getMessage()).isEqualTo("boom");
+                assertThat(event.getFormattedMessage()).contains(RESERVE_URL);
+              });
+    } finally {
+      logger.detachAppender(appender);
+      appender.stop();
+    }
+  }
+
   private void expectBadRequestProblem(ResultActions result, String detail) throws Exception {
     expectProblemDetail(result, 400, "Bad Request", detail, RESERVE_URL);
   }
@@ -239,11 +315,16 @@ class InventoryControllerTest {
       throws Exception {
     result
         .andExpect(status().is(status))
+        .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
         .andExpect(jsonPath("$.type").value("about:blank"))
         .andExpect(jsonPath("$.title").value(title))
-        .andExpect(jsonPath("$.status").value(status))
-        .andExpect(jsonPath("$.detail").value(detail))
-        .andExpect(jsonPath("$.instance").value(instance));
+        .andExpect(jsonPath("$.status").value(status));
+
+    if (detail != null) {
+      result.andExpect(jsonPath("$.detail").value(detail));
+    }
+
+    result.andExpect(jsonPath("$.instance").value(instance));
   }
 
   private ResultActions performReserve(String body) throws Exception {
