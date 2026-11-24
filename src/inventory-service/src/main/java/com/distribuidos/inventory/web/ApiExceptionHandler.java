@@ -1,8 +1,10 @@
 package com.distribuidos.inventory.web;
 
 import com.distribuidos.inventory.exception.ProductNotFoundException;
+import com.distribuidos.inventory.exception.StockUnavailableException;
 import jakarta.servlet.http.HttpServletRequest;
 import java.net.URI;
+import java.util.Map;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
@@ -39,6 +41,21 @@ public class ApiExceptionHandler {
       ProductNotFoundException exception, HttpServletRequest request) {
     return ResponseEntity.status(HttpStatus.NOT_FOUND)
         .body(problem(HttpStatus.NOT_FOUND, exception.getMessage(), request));
+  }
+
+  @ExceptionHandler(StockUnavailableException.class)
+  ResponseEntity<Map<String, Object>> handleStockUnavailable(StockUnavailableException exception) {
+    return ResponseEntity.badRequest()
+        .body(
+            Map.of(
+                "productCode",
+                exception.getProductCode(),
+                "available",
+                false,
+                "remainingStock",
+                exception.getAvailableStock(),
+                "message",
+                exception.getMessage()));
   }
 
   private ProblemDetail problem(HttpStatus status, String detail, HttpServletRequest request) {
