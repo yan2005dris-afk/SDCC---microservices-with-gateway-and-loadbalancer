@@ -30,6 +30,16 @@ class InventoryProductRepositoryJpaTest {
     assertRow(code, 50, 0, 2);
   }
 
+  @Test
+  void reserveAboveStockUpdatesNoRows() {
+    String code = "JPA-INSUFFICIENT";
+    seed(code, 3);
+
+    assertThat(repository.reserveAtomically(code, 5)).isZero();
+    assertRow(code, 3, 0, 0);
+    assertThat(repository.findByProductCode(code).orElseThrow().getStock()).isEqualTo(3);
+  }
+
   private void seed(String code, int stock) {
     InventoryProduct product = new InventoryProduct();
     product.setProductCode(code);
