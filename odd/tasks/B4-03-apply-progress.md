@@ -57,3 +57,24 @@ cfd52e8 feat(inventory): return custom 400 for insufficient stock
 91dfa66 feat(inventory): map validation failures to ProblemDetail
 abd9451 feat(inventory): add API exception handler advice
 ```
+
+---
+
+## Verificación (2026-11-24 08:24) — FAIL
+
+Verificado contra `eb27734` (pre-B4-03) y HEAD con probes MockMvc:
+
+| Petición | pre-B4-03 | HEAD | Correcto |
+|---|---|---|---|
+| `PUT /api/inventory/reserve` | 405 | **500** | 405 |
+| `POST /reserve` con `Content-Type: text/plain` | 415 | **500** | 415 |
+| Ruta sin mapping | 404 | **500** | 404 |
+
+Causa: `@ExceptionHandler(Exception.class)` captura también las excepciones estándar de Spring MVC
+(`ExceptionHandlerExceptionResolver` corre antes que `DefaultHandlerExceptionResolver`).
+
+Otros hallazgos: el catch-all no loguea la causa raíz; ningún test cubre 405/415/404 ni el
+`Content-Type: application/problem+json`; `docs/api-contracts/API_CONTRACT.md` quedó desactualizado.
+
+**Rework:** `odd/tasks/B4-07-inventory-error-handling-fix.md` (Opción A: heredar de
+`ResponseEntityExceptionHandler`). B4-03 permanece abierta hasta que B4-07 cierre.
