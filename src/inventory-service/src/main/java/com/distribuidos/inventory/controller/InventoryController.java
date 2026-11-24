@@ -1,8 +1,6 @@
 package com.distribuidos.inventory.controller;
 
 import com.distribuidos.inventory.dto.ReserveStockRequest;
-import com.distribuidos.inventory.exception.ProductNotFoundException;
-import com.distribuidos.inventory.exception.StockUnavailableException;
 import com.distribuidos.inventory.model.InventoryProduct;
 import com.distribuidos.inventory.repository.InventoryProductRepository;
 import jakarta.validation.Valid;
@@ -42,12 +40,20 @@ public class InventoryController {
 
     var productOpt = repository.findByProductCode(productCode);
     if (productOpt.isEmpty()) {
-      throw new ProductNotFoundException(productCode);
+      return ResponseEntity.badRequest().body(Map.of("error", "Producto no encontrado"));
     }
 
     InventoryProduct product = productOpt.get();
     if (product.getStock() < quantity) {
-      throw new StockUnavailableException(productCode, product.getStock());
+      return ResponseEntity.badRequest()
+          .body(
+              Map.of(
+                  "available",
+                  false,
+                  "error",
+                  "Stock insuficiente",
+                  "currentStock",
+                  product.getStock()));
     }
 
     product.setStock(product.getStock() - quantity);

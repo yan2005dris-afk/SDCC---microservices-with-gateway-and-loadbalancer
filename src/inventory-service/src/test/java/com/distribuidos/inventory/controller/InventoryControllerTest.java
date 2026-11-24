@@ -48,6 +48,29 @@ class InventoryControllerTest {
   }
 
   @Test
+  void unknownProductKeepsBadRequestResponse() throws Exception {
+    when(repository.findByProductCode("PROD-999")).thenReturn(Optional.empty());
+
+    performReserve("{\"productCode\":\"PROD-999\",\"quantity\":5}")
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.error").value("Producto no encontrado"));
+  }
+
+  @Test
+  void insufficientStockKeepsBadRequestResponse() throws Exception {
+    InventoryProduct product = new InventoryProduct();
+    product.setProductCode("PROD-001");
+    product.setStock(2);
+    product.setReservedStock(0);
+    when(repository.findByProductCode("PROD-001")).thenReturn(Optional.of(product));
+
+    performReserve("{\"productCode\":\"PROD-001\",\"quantity\":5}")
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.available").value(false))
+        .andExpect(jsonPath("$.currentStock").value(2));
+  }
+
+  @Test
   void validRequestReservesStock() throws Exception {
     InventoryProduct product = new InventoryProduct();
     product.setProductCode("PROD-001");
