@@ -78,3 +78,16 @@ Otros hallazgos: el catch-all no loguea la causa raíz; ningún test cubre 405/4
 
 **Rework:** `odd/tasks/B4-07-inventory-error-handling-fix.md` (Opción A: heredar de
 `ResponseEntityExceptionHandler`). B4-03 permanece abierta hasta que B4-07 cierre.
+
+### Re-verificación (2026-11-24 09:10)
+
+Probe MockMvc contra HEAD (con los commits posteriores: `a633499`, `22277f8`, `a969dbe`):
+
+```
+B4-03 PUT reserve=500 (esperado 405) | POST text/plain=500 (esperado 415)
+     | ruta sin mapping=500 (esperado 404) | POST release text/plain=500 (esperado 415)
+```
+
+El FAIL **sigue reproduciéndose** en HEAD. Se agrega el 4º caso (`POST /api/inventory/release` con
+`text/plain` → 500, esperado 415), que no estaba en la primera tabla de evidencia y ya está cubierto por la
+tarea D de `odd/tasks/B4-07-inventory-error-handling-fix.md`.

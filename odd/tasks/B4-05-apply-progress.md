@@ -87,3 +87,30 @@ a2edd99 feat(db): add unique index for stock movement idempotency
 41fae67 feat(inventory): add stock movement repository
 6103937 feat(inventory): add stock movement model
 ```
+
+---
+
+## Verificación (2026-11-24 09:10) — FAIL
+
+Re-verificado contra HEAD con probes reales (esquema replicado del DDL de Postgres 15:
+`docker/postgres/02-init-schemas.sql`, con `CHECK (stock >= 0)`, `CHECK (reserved_stock >= 0)` y el índice
+único `uq_stock_movement_ref_type`). Docker sigue caído → H2 con el mismo esquema.
+
+| # | Hallazgo | Evidencia | Estado |
+|---|---|---|---|
+| 1 | La idempotencia se keyea **solo por `orderNumber`**, no por producto: la 2ª reserva de OTRO producto con el mismo `orderNumber` responde **200 sin reservar nada** | `P1 after reserve A: PROD-A=45/5 PROD-B=30/0` → 2ª reserva PROD-B: `available=true remainingStock=30` y `PROD-B` sigue `30/0` | ❌ FAIL |
+| 2 | `releaseAtomically` **no tiene guard** `reservedStock >= :qty` | con CHECK de Postgres → `EXCEPTION DataIntegrityViolationException` (fila queda `45/0`, rollback) → **500** en vez de un 400 controlado | ❌ FAIL |
+| 2b | El mismo release **sin** el CHECK (otra BD / si se cae el constraint) → corrupción silenciosa | `P2b updated=1 row(stock/reserved)=49/-4` → `reserved_stock = -4` y **stock inflado 45→49** (sobreventa) | ❌ FAIL (preexistente solo en el DDL de Postgres) |
+| 3 | El check-then-insert del servicio no es atómico → 2 reservas concurrentes con el mismo `orderNumber` violan el índice único → **500** en vez de 200 | `P3 A check -> Optional.empty` → `A insert -> DataIntegrityViolationException (índice único violado)` | ❌ FAIL |
+
+**Corrección a la caracterización previa:** el `reserved_stock` negativo **no** ocurre en Postgres gracias al
+`CHECK (reserved_stock >= 0)` del DDL; allí el síntoma es un **500 por violación de constraint**. El
+`reserved = -4` / `stock = 49` solo aparece si el constraint no está (o se cae). El defecto real es que
+`releaseAtomically` **no valida el invariante en la propia query** y el error sale como 500 en vez de 400.
+
+**Rework:** `odd/tasks/B4-08-inventory-idempotence-concurrency.md` — con errata obligatoria en
+`odd/tasks/B4-08-verification-errata.md` (la S1 actual reproduce el defecto y la S4 parte de una premisa
+falsa: el constraint `CHECK` **sí existe** en `02-init-schemas.sql`).
+
+**Bonus (no bloqueante):** el índice único solo se crea al inicializar una BD **nueva**. Una BD ya inicializada
+con el esquema viejo queda sin él → la idempotencia por `orderNumber` no está protegida en ese caso.
