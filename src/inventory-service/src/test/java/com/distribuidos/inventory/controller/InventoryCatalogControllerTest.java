@@ -85,6 +85,26 @@ class InventoryCatalogControllerTest {
   }
 
   @Test
+  void listProductsUsesRequestedPageNumber() throws Exception {
+    when(repository.findAll(any(Pageable.class)))
+        .thenReturn(
+            new PageImpl<>(
+                List.of(product("PROD-003")),
+                org.springframework.data.domain.PageRequest.of(1, 2, Sort.by("productCode")),
+                5));
+
+    mockMvc
+        .perform(get(CATALOG_URL).param("page", "1").param("size", "2"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.content[0].productCode").value("PROD-003"))
+        .andExpect(jsonPath("$.totalElements").value(5))
+        .andExpect(jsonPath("$.currentPage").value(1))
+        .andExpect(jsonPath("$.size").value(2));
+
+    verify(repository).findAll(pageable(1, 2));
+  }
+
+  @Test
   void listProductsCapsRequestedSizeAtOneHundred() throws Exception {
     when(repository.findAll(any(Pageable.class)))
         .thenAnswer(
