@@ -1,5 +1,7 @@
 package com.distribuidos.inventory.controller;
 
+import com.distribuidos.inventory.dto.PagedResponse;
+import com.distribuidos.inventory.dto.ProductResponse;
 import com.distribuidos.inventory.dto.ReleaseResponse;
 import com.distribuidos.inventory.dto.ReleaseStockRequest;
 import com.distribuidos.inventory.dto.ReserveStockRequest;
@@ -7,6 +9,9 @@ import com.distribuidos.inventory.exception.ProductNotFoundException;
 import com.distribuidos.inventory.repository.InventoryProductRepository;
 import com.distribuidos.inventory.service.InventoryReservationService;
 import jakarta.validation.Valid;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -21,6 +26,26 @@ public class InventoryController {
       InventoryProductRepository repository, InventoryReservationService reservationService) {
     this.repository = repository;
     this.reservationService = reservationService;
+  }
+
+  @GetMapping
+  public PagedResponse<ProductResponse> listProducts(Pageable pageable) {
+    Pageable effective =
+        pageable.getSort().isSorted()
+            ? pageable
+            : PageRequest.of(
+                pageable.getPageNumber(), pageable.getPageSize(), Sort.by("productCode"));
+    return PagedResponse.from(
+        repository
+            .findAll(effective)
+            .map(
+                product ->
+                    new ProductResponse(
+                        product.getProductCode(),
+                        product.getName(),
+                        product.getDescription(),
+                        product.getStock(),
+                        product.getUnitPrice())));
   }
 
   @GetMapping("/{productCode}")
