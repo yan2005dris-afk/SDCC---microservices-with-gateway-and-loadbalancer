@@ -3,7 +3,7 @@
 **Feature:** ODD — B6-02: Reposición de Stock (INV-07)
 **Spec:** `odd/archive/B6-02-inventory-restock.md`
 **Branch:** `brydyan/feature/inventory-stock-mov-restock`
-**Status:** implemented; unit suite green (67 tests); integration verify still blocked by missing Docker
+**Status:** implemented and verified — `mvn verify` green (unit + integration against real PostgreSQL); 2 test-coverage gaps pending (see `odd/verification/B6-02-verification-2026-11-25.md`)
 
 ## Tasks
 
@@ -20,7 +20,7 @@
 - [x] RESTOCK movement inserted in the same service transaction
 - [x] 404 when the product does not exist
 - [x] Tests: normal restock, 404, response content
-- [ ] `mvn verify -pl inventory-service` passes — blocked: Docker unavailable; `InventoryReservationIT` requires PostgreSQL/Testcontainers
+- [x] `mvn verify -pl inventory-service` passes — verified 2026-11-25 (JDK 21 + Docker rootless local): BUILD SUCCESS, 67 unit + 14 IT green against real PostgreSQL 15. The literal command needs `-f src/pom.xml` (no root pom) or must run from `src/inventory-service`
 
 ## Tests
 
@@ -40,9 +40,12 @@
 
 `mvn test` (from `src/inventory-service`, JDK 21): 67 tests, 0 failures, 0 errors.
 
-`mvn clean verify` (from `src/inventory-service`, JDK 21): unit phase green; `InventoryReservationIT` fails with
-"Los tests de integración de inventory-service requieren un PostgreSQL real (Docker en ejecución o un Postgres accesible). Para el ciclo rápido sin Docker usa: mvn test -pl inventory-service".
-Missing to close DoD: Docker daemon or reachable PostgreSQL for the IT.
+`mvn clean verify` (from `src/inventory-service`, JDK 21): **BUILD SUCCESS**. Unit phase 67 green;
+`InventoryReservationIT` 14/14 green against a real PostgreSQL 15 container (`postgres:15-alpine`).
+Verified 2026-11-25 with a rootless Docker daemon (no root on this machine): `rootlesskit` 3.3.0 +
+`slirp4netns` 1.3.7 + `dockerd-rootless.sh` (moby/moby), `--storage-driver=vfs`,
+`DOCKER_HOST=unix:///tmp/rdl/docker.sock`. Recipe in
+`odd/verification/B6-01-rework-verification-2026-11-25.md` §8.
 
 Differential check: existing `InventoryControllerTest` + `InventoryCatalogControllerTest` on base `152314e` and on final tree both report 32 tests, 0 failures, 0 errors. No regression in `GET /api/inventory`, `GET /{productCode}`, `/reserve`, or `/release`.
 
