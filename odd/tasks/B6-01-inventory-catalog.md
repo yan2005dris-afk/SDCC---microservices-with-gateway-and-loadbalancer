@@ -1,6 +1,6 @@
 # ODD — B6-01: Catálogo Paginado (INV-07)
 
-**Rama:** `brydyan/feature/inventory-reserve-hardening`  
+**Rama:** `brydyan/feature/inventory-inventory-stock-mov-restock`  
 **Depende de:** B4-01, B4-04 (ProductResponse DTO creado)  
 **Bloquea:** —  
 **Responsable:** Andy

@@ -1,6 +1,6 @@
 # ODD — B6-02: Reposición de Stock (INV-07)
 
-**Rama:** `brydyan/feature/inventory-reserve-hardening`  
+**Rama:** `brydyan/feature/inventory-inventory-stock-mov-restock`  
 **Depende de:** B4-05 (StockMovement entity, service)  
 **Bloquea:** —  
 **Responsable:** Andy
