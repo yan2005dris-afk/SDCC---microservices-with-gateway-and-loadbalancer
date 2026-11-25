@@ -65,6 +65,7 @@ Testcontainers: "Could not find a valid Docker environment". Missing to close Do
 - ODD header names branch `brydyan/feature/inventory-inventory-stock-mov-restock`; working branch is `brydyan/feature/inventory-stock-mov-restock`. Header not edited (explicitly out of scope).
 - Build requires JDK 21 here: default JDK 25 makes Byte Buddy/Mockito fail with "Java 25 (69) is not supported by the current version of Byte Buddy" (pre-existing, reproduced on base with 25 errors).
 - RDD assess (`gentle-ai review assess --base-ref 281621d --json`): `risk=medium`, `review_due=false`, `reason=under_budget`. No review started.
+- RDD assess for rework (`--base-ref d97f717`, untracked verification/task files excluded): `risk=medium`, `review_due=false`, `reason=under_budget`. No review started.
 - Risk: none (additive endpoint and sort filtering; existing `GET /{productCode}`, `/reserve`, `/release` behavior covered by unchanged tests).
 
 Ready for QA review or merge once integration environment has Docker/PostgreSQL.
