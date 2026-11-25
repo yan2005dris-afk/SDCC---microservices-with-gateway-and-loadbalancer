@@ -85,6 +85,23 @@ class InventoryCatalogControllerTest {
   }
 
   @Test
+  void listProductsCapsRequestedSizeAtOneHundred() throws Exception {
+    when(repository.findAll(any(Pageable.class)))
+        .thenAnswer(
+            invocation -> {
+              Pageable requested = invocation.getArgument(0);
+              return new PageImpl<>(List.of(product("PROD-001")), requested, 5);
+            });
+
+    mockMvc
+        .perform(get(CATALOG_URL).param("size", "150"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.size").value(100));
+
+    verify(repository).findAll(pageable(0, 100));
+  }
+
+  @Test
   void listProductsKeepsClientSortWhenProvided() throws Exception {
     when(repository.findAll(any(Pageable.class)))
         .thenReturn(

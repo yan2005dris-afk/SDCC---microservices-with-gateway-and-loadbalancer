@@ -19,6 +19,8 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/api/inventory")
 public class InventoryController {
 
+  private static final int MAX_PAGE_SIZE = 100;
+
   private final InventoryProductRepository repository;
   private final InventoryReservationService reservationService;
 
@@ -30,11 +32,10 @@ public class InventoryController {
 
   @GetMapping
   public PagedResponse<ProductResponse> listProducts(Pageable pageable) {
+    Sort sort = pageable.getSort().isSorted() ? pageable.getSort() : Sort.by("productCode");
     Pageable effective =
-        pageable.getSort().isSorted()
-            ? pageable
-            : PageRequest.of(
-                pageable.getPageNumber(), pageable.getPageSize(), Sort.by("productCode"));
+        PageRequest.of(
+            pageable.getPageNumber(), Math.min(pageable.getPageSize(), MAX_PAGE_SIZE), sort);
     return PagedResponse.from(
         repository
             .findAll(effective)
