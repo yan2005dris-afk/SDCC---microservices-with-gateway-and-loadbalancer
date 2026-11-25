@@ -492,7 +492,7 @@ observability/CorrelationIdFilter, observability/InstanceIdentity, observability
 
 **Tareas:** ORD-06, ORD-07, `Idempotency-Key`, ajustes de B4 (bloqueo redundante, `release` tipado, campo `message`) · **Base:** `develop` con B2, B3 y B4 · **Afecta:** P04
 
-> **Estado:** 🧪 implementado; tests escritos y compilados, **pendientes de ejecutar**. Marcar las casillas de tests y verificación al ejecutarlas.
+> **Estado:** ✅ verificado en el clúster (P04, 400/422, 503 + `Retry-After`, `Idempotency-Key` 201→200 con el stock descontado una vez, `release` idempotente). Tests escritos y compilados; **pendiente ejecutarlos** (casillas de Tests).
 
 ### Objetivo
 Que el precio y el nombre del producto vengan de inventario, que la llamada entre servicios tenga timeouts y códigos HTTP correctos, que se compense la reserva cuando el pedido no llega a registrarse, y que un reintento del cliente no duplique pedidos.
@@ -533,6 +533,13 @@ controller/ApiExceptionHandler    400 / 422 / 502 / 503 + Retry-After, formato {
 
 **Descartado:** reintentos automáticos de `reserve`, circuit breaker en `order-service` (dependencia nueva; bastan timeouts + CB del Gateway), Sagas (excluidas por la consigna).
 
+### Hallazgos durante la verificación
+| # | Problema | Causa | Solución |
+|---|---|---|---|
+| H5 | `docker compose up --build` en frío: `inventory-service` y `order-service` quedaban `unhealthy` y el Gateway no arrancaba | Arranque de la JVM de 130 s con todo el clúster iniciando a la vez, por encima de `start_period` 90 s + 3 reintentos | `start_period: 180s` en los servicios Java (Compose y Swarm) |
+| H6 | Con inventario detenido se registraba `COMPENSATION_FAILED` aunque la reserva nunca se envió | Mientras Eureka aún anuncia la instancia, la conexión falla con "Connect timed out" / "No route to host", no con `ConnectException` | Esos casos cuentan como petición no enviada; el timeout de lectura sigue compensando |
+| H7 | Tras reiniciar inventario (ya `healthy`), los pedidos daban 503 "sin instancias" durante ~1 min | `order-service` usaba `registry-fetch-interval` 30 s + caché del LoadBalancer 35 s (el Gateway ya usaba 5 s + 5 s) | `registry-fetch-interval-seconds: 5` y `spring.cloud.loadbalancer.cache.ttl: 5s` |
+
 ### Checklist
 - [x] `InventoryStockClient#reserve(code, qty, orderNumber)` y `#release(orderNumber)`; `InventoryReserveRequest` + `orderNumber`; `InventoryReserveResponse` + `unitPrice`, `productName`, `message`.
 - [x] `InventoryClientProperties` + `InventoryClientConfig` (timeouts, `clone()` del builder balanceado).
@@ -550,10 +557,10 @@ controller/ApiExceptionHandler    400 / 422 / 502 / 503 + Retry-After, formato {
 - [ ] Inventario: `InventoryReservationServiceTest`, `InventoryControllerTest` y `InventoryReservationIT` sin el bloqueo y con `ReleaseResponse`.
 
 ### Verificación manual
-- [ ] P04: pedido con `unitPrice` falso → se guarda con el `unit_price` de `inventory_db`.
-- [ ] Stock insuficiente → 400; producto inexistente → 422.
-- [ ] `docker stop inventory-service` → 503 + `Retry-After`, sin pedido creado.
-- [ ] `Idempotency-Key` repetida → 201 y luego 200 con el mismo pedido; el stock baja una sola vez.
+- [x] P04: pedido con `unitPrice` falso → se guarda con el `unit_price` de `inventory_db`.
+- [x] Stock insuficiente → 400; producto inexistente → 422.
+- [x] `docker stop inventory-service` → 503 + `Retry-After`, sin pedido creado.
+- [x] `Idempotency-Key` repetida → 201 y luego 200 con el mismo pedido; el stock baja una sola vez.
 
 ---
 
@@ -686,8 +693,8 @@ Marca cada tarea cuando esté **implementada y verificada en su rama**.
 - [x] **ORD-03** Logs del nodo de BD por operación + `correlationId` — *B2*
 - [x] **ORD-04** Failover en `GET /api/orders/{id}` — *B2*
 - [x] **ORD-05** Detección proactiva de réplicas caídas — *B3*
-- [ ] **ORD-06** Precio y nombre del producto desde inventario — *B5*
-- [ ] **ORD-07** Compensación `release` si falla la persistencia — *B5*
+- [x] **ORD-06** Precio y nombre del producto desde inventario — *B5*
+- [x] **ORD-07** Compensación `release` si falla la persistencia — *B5*
 - [x] **ORD-08** Tests de integración con Testcontainers + `mvn verify` en CI — *B2 (se amplía en B3)*
 - [x] **ORD-09** Health de tráfico sin dependencia de la BD compartida (readiness) — *B2, hallazgo H1*
 - [x] Cabecera `X-Replication-Lag-Ms` — *B3*
