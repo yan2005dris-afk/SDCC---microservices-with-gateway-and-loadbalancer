@@ -1,7 +1,5 @@
 package com.distribuidos.inventory.controller;
 
-import com.distribuidos.inventory.dto.ReleaseResponse;
-import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -17,6 +15,7 @@ import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
+import com.distribuidos.inventory.dto.ReleaseResponse;
 import com.distribuidos.inventory.dto.ReservationResponse;
 import com.distribuidos.inventory.exception.ProductNotFoundException;
 import com.distribuidos.inventory.exception.ReservationNotFoundException;
@@ -26,7 +25,7 @@ import com.distribuidos.inventory.repository.InventoryProductRepository;
 import com.distribuidos.inventory.service.InventoryReservationService;
 import com.distribuidos.inventory.web.ApiExceptionHandler;
 import java.math.BigDecimal;
-import java.util.Map;
+import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.slf4j.LoggerFactory;

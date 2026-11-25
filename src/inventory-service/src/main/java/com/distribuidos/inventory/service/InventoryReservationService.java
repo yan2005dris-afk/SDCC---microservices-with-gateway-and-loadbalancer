@@ -149,7 +149,6 @@ public class InventoryReservationService {
         remaining);
   }
 
-
   private int insertMovement(
       String productCode, MovementType type, int quantity, String orderNumber) {
     return stockMovementRepository.insertIfAbsent(productCode, type.name(), quantity, orderNumber);
@@ -159,7 +158,6 @@ public class InventoryReservationService {
     return stockMovementRepository.findByReferenceOrderNumberAndTypeAndProductCode(
         orderNumber, MovementType.RESERVATION, productCode);
   }
-
 
   private ReservationResponse reservationResponse(String productCode) {
     // Read inside the same transaction, right after the conditional UPDATE.

@@ -12,7 +12,6 @@ import org.springframework.stereotype.Repository;
 public interface InventoryProductRepository extends JpaRepository<InventoryProduct, Long> {
   Optional<InventoryProduct> findByProductCode(String productCode);
 
-
   @Modifying(clearAutomatically = true, flushAutomatically = true)
   @Query(
       """

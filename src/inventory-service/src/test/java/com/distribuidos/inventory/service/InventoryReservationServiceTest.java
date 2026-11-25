@@ -1,6 +1,5 @@
 package com.distribuidos.inventory.service;
 
-import com.distribuidos.inventory.dto.ReleaseResponse;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
@@ -12,6 +11,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.distribuidos.inventory.dto.ReleaseResponse;
 import com.distribuidos.inventory.dto.ReservationResponse;
 import com.distribuidos.inventory.exception.InvalidStockReleaseException;
 import com.distribuidos.inventory.exception.ProductNotFoundException;
@@ -25,7 +25,6 @@ import com.distribuidos.inventory.repository.StockMovementRepository;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;

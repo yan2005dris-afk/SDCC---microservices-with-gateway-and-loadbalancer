@@ -65,7 +65,6 @@ class InventoryProductRepositoryJpaTest {
     assertThat(repository.findByProductCode(code).orElseThrow().getStock()).isEqualTo(50);
   }
 
-
   @Test
   void reserveBulkUpdateFlushesBeforeExecuting() throws NoSuchMethodException {
     Method method =

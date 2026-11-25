@@ -40,7 +40,8 @@ public class InventoryController {
   }
 
   @PostMapping("/release")
-  public ResponseEntity<ReleaseResponse> releaseStock(@Valid @RequestBody ReleaseStockRequest request) {
+  public ResponseEntity<ReleaseResponse> releaseStock(
+      @Valid @RequestBody ReleaseStockRequest request) {
     return ResponseEntity.ok().body(reservationService.releaseStock(request.orderNumber()));
   }
 }

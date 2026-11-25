@@ -134,7 +134,6 @@ class OrderReadRoutingIT {
 
     assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
     assertThat(response.getHeaders().getFirst("X-Database-Node")).isEqualTo("PRIMARY");
-    assertThat(response.getBody().totalAmount()).isEqualByComparingTo("3799.98");
     assertThat(response.getBody().customerName()).isEqualTo("PRIMARY");
   }
 
@@ -152,6 +151,8 @@ class OrderReadRoutingIT {
 
     assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
     assertThat(response.getHeaders().getFirst("X-Database-Node")).isEqualTo("PRIMARY");
+    // Precio de inventario (1899.99 x 2), no el unitPrice=1.00 que envió el cliente.
+    assertThat(response.getBody().totalAmount()).isEqualByComparingTo("3799.98");
     assertThat(countOrders(PRIMARY)).isEqualTo(2);
     assertThat(countOrders(REPLICA_1)).isEqualTo(1);
     assertThat(countOrders(REPLICA_2)).isEqualTo(1);
