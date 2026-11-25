@@ -122,6 +122,36 @@ class InventoryCatalogControllerTest {
   }
 
   @Test
+  void listProductsIgnoresUnknownSortProperty() throws Exception {
+    when(repository.findAll(any(Pageable.class)))
+        .thenReturn(new PageImpl<>(List.of(product("PROD-001")), pageable(0, 20), 5));
+
+    mockMvc.perform(get(CATALOG_URL).param("sort", "bogus")).andExpect(status().isOk());
+
+    verify(repository).findAll(pageable(0, 20));
+  }
+
+  @Test
+  void listProductsKeepsOnlyKnownSortProperties() throws Exception {
+    when(repository.findAll(any(Pageable.class)))
+        .thenReturn(
+            new PageImpl<>(
+                List.of(product("PROD-001")),
+                org.springframework.data.domain.PageRequest.of(
+                    0, 20, Sort.by(Sort.Order.desc("name"))),
+                5));
+
+    mockMvc
+        .perform(get(CATALOG_URL).param("sort", "name,desc").param("sort", "bogus,asc"))
+        .andExpect(status().isOk());
+
+    verify(repository)
+        .findAll(
+            org.springframework.data.domain.PageRequest.of(
+                0, 20, Sort.by(Sort.Order.desc("name"))));
+  }
+
+  @Test
   void listProductsKeepsClientSortWhenProvided() throws Exception {
     when(repository.findAll(any(Pageable.class)))
         .thenReturn(

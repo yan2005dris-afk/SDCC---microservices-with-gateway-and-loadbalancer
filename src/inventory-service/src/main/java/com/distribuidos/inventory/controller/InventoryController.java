@@ -9,6 +9,8 @@ import com.distribuidos.inventory.exception.ProductNotFoundException;
 import com.distribuidos.inventory.repository.InventoryProductRepository;
 import com.distribuidos.inventory.service.InventoryReservationService;
 import jakarta.validation.Valid;
+import java.util.List;
+import java.util.Set;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
@@ -21,6 +23,9 @@ public class InventoryController {
 
   private static final int MAX_PAGE_SIZE = 100;
 
+  private static final Set<String> SORTABLE_PROPERTIES =
+      Set.of("productCode", "name", "description", "stock", "unitPrice", "createdAt", "updatedAt");
+
   private final InventoryProductRepository repository;
   private final InventoryReservationService reservationService;
 
@@ -32,7 +37,7 @@ public class InventoryController {
 
   @GetMapping
   public PagedResponse<ProductResponse> listProducts(Pageable pageable) {
-    Sort sort = pageable.getSort().isSorted() ? pageable.getSort() : Sort.by("productCode");
+    Sort sort = resolveSort(pageable);
     Pageable effective =
         PageRequest.of(
             pageable.getPageNumber(), Math.min(pageable.getPageSize(), MAX_PAGE_SIZE), sort);
@@ -47,6 +52,14 @@ public class InventoryController {
                         product.getDescription(),
                         product.getStock(),
                         product.getUnitPrice())));
+  }
+
+  private static Sort resolveSort(Pageable pageable) {
+    List<Sort.Order> allowed =
+        pageable.getSort().stream()
+            .filter(order -> SORTABLE_PROPERTIES.contains(order.getProperty()))
+            .toList();
+    return allowed.isEmpty() ? Sort.by("productCode") : Sort.by(allowed);
   }
 
   @GetMapping("/{productCode}")
