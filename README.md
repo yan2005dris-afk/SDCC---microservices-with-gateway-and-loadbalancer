@@ -66,12 +66,27 @@ El sistema implementa un dominio de comercio electrónico ligero compuesto por d
 | **Eureka Server** | `eureka-server` | `8761` (`8761`) | Servidor de descubrimiento y registro de microservicios. |
 | **Order Service (Instancia 1)** | `order-service-1` | `8081` (`8081`) | Transaccional, enrutamiento `AbstractRoutingDataSource`. |
 | **Order Service (Instancia 2)** | `order-service-2` | `8083` (`8081`) | Instancia balanceada; el ID Eureka `order-service-2:8083` es un identificador, no el puerto del contenedor. |
-| **Inventory Service** | `inventory-service` | `8082` (`8082`) | Catálogo de productos y reserva de stock atómica. |
+| **Inventory Service** | `inventory-service` | `8082` (`8082`) | Catálogo paginado de productos, reserva de stock atómica y reposición de stock. |
 | **PostgreSQL Primary** | `postgres-primary` | `5435` (`5432`, configurable con `PG_PRIMARY_PORT`) | Nodo maestro para escrituras y emisión de streaming WAL. |
 | **PostgreSQL Réplica 1** | `postgres-replica1` | `5433` (`5432`) | Réplica física de solo lectura (`hot_standby = on`). |
 | **PostgreSQL Réplica 2** | `postgres-replica2` | `5434` (`5432`) | Réplica física de solo lectura (`hot_standby = on`). |
 
 > **Diagrama Interactivo:** Puedes explorar el diagrama interactivo renderizado con Archify en [docs/architecture/architecture.html](docs/architecture/architecture.html) o el diagrama de persistencia en [docs/architecture/stack-diagram-database.html](docs/architecture/stack-diagram-database.html).
+
+### API de Inventario (sin autenticación)
+
+> **Ninguno de estos endpoints requiere autenticación ni credenciales.** Es una herramienta interna del
+> proyecto y así se declara en la invariante "sin autenticación" del plan de implementación. El
+> endpoint de reposición escribe stock real, por lo que su exposición debe limitarse a la red interna
+> del clúster (no publicarlo directamente en Internet).
+
+| Método y ruta | Descripción | Respuesta |
+|---|---|---|
+| `GET /api/inventory?page=0&size=20` | Catálogo paginado de productos. `size` máximo 100 (se trunca a 100 si se pide más), orden por defecto `productCode ASC`; un `sort` con una propiedad desconocida se descarta. | `{ content, totalElements, totalPages, currentPage, size }` |
+| `GET /api/inventory/{productCode}` | Detalle de un producto por código. | `200` con el producto · `404` si no existe |
+| `POST /api/inventory/reserve` | Reserva stock para un pedido (idempotente por `orderNumber`). | `200` con el resultado de la reserva · `400` si no hay stock |
+| `POST /api/inventory/release` | Devuelve el stock de una reserva (idempotente). | `200` con el resultado de la liberación |
+| `PUT /api/inventory/{productCode}/stock` | **Reposición atómica.** Body `{"quantity": 25}` (`quantity` > 0). Incrementa el stock y registra un movimiento `RESTOCK` en la **misma transacción**. | `200` con `{ productCode, quantity, stock, message }` · `400` si `quantity` falta o no es positivo · `404` si el producto no existe |
 
 ---
 

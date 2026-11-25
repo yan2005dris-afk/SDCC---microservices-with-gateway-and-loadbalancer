@@ -152,10 +152,11 @@ Catálogo de productos y control de stock (1 instancia). Recibe la llamada de `o
   - Agregar `POST /api/inventory/release` para la compensación de ORD-07 (opcional).
 - **Estado:** resuelto en B4. La entidad `StockMovement` (+ `MovementType`) se escribe en la **misma transacción** que el `UPDATE` de stock, con `ON CONFLICT DO NOTHING` y el índice único parcial `uq_stock_movement_order_product_type (reference_order_number, movement_type, product_code)` como red de seguridad. `POST /api/inventory/release` existe y es idempotente: el segundo `RELEASE` no devuelve el stock otra vez. Índice adicional `idx_stock_movement_product_code` para consultar movimientos por producto. La compensación desde `order-service` es ORD-07 (bloque B5).
 
-#### 🟡 INV-07 — Falta la gestión de inventario prometida en el PRD
+#### ✅ INV-07 — Gestión de inventario del PRD
 - **Dónde:** [PRD.md §3](../prd/PRD.md): *"Administrador: consulta y actualiza el stock disponible de productos"*.
-- **Problema:** solo existe `GET /api/inventory/{productCode}`. No hay listado de catálogo ni reposición.
-- **Solución propuesta:** `GET /api/inventory` (listar productos) y `PUT /api/inventory/{productCode}/stock` (reponer). La alternativa es recortar el PRD para que coincida con lo implementado.
+- **Problema original:** solo existía `GET /api/inventory/{productCode}`. No había listado de catálogo ni reposición.
+- **Solución implementada:** `GET /api/inventory?page=0&size=20` (catálogo paginado, `size` máximo 100) y `PUT /api/inventory/{productCode}/stock` (reposición atómica con movimiento `RESTOCK` en la misma transacción).
+- **Estado:** resuelto en **B6** (B6-01 catálogo, B6-02 reposición), verificado el 2026-11-25 con `mvn verify -pl inventory-service` en verde contra PostgreSQL real. Reportes en `odd/verification/B6-01-verification-2026-11-25.md` y `odd/verification/B6-02-verification-2026-11-25.md`.
 
 ---
 
