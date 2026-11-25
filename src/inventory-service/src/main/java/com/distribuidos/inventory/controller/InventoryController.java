@@ -14,6 +14,7 @@ import com.distribuidos.inventory.service.InventoryRestockService;
 import jakarta.validation.Valid;
 import java.util.List;
 import java.util.Set;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
@@ -24,22 +25,23 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/api/inventory")
 public class InventoryController {
 
-  private static final int MAX_PAGE_SIZE = 100;
-
   private static final Set<String> SORTABLE_PROPERTIES =
       Set.of("productCode", "name", "description", "stock", "unitPrice", "createdAt", "updatedAt");
 
   private final InventoryProductRepository repository;
   private final InventoryReservationService reservationService;
   private final InventoryRestockService restockService;
+  private final int maxPageSize;
 
   public InventoryController(
       InventoryProductRepository repository,
       InventoryReservationService reservationService,
-      InventoryRestockService restockService) {
+      InventoryRestockService restockService,
+      @Value("${inventory.pagination.max-page-size:100}") int maxPageSize) {
     this.repository = repository;
     this.reservationService = reservationService;
     this.restockService = restockService;
+    this.maxPageSize = Math.max(1, maxPageSize);
   }
 
   @GetMapping
@@ -47,7 +49,7 @@ public class InventoryController {
     Sort sort = resolveSort(pageable);
     Pageable effective =
         PageRequest.of(
-            pageable.getPageNumber(), Math.min(pageable.getPageSize(), MAX_PAGE_SIZE), sort);
+            pageable.getPageNumber(), Math.min(pageable.getPageSize(), maxPageSize), sort);
     return PagedResponse.from(
         repository
             .findAll(effective)

@@ -88,6 +88,10 @@ El sistema implementa un dominio de comercio electrónico ligero compuesto por d
 | `POST /api/inventory/release` | Devuelve el stock de una reserva (idempotente). | `200` con el resultado de la liberación |
 | `PUT /api/inventory/{productCode}/stock` | **Reposición atómica.** Body `{"quantity": 25}` (`quantity` > 0). Incrementa el stock y registra un movimiento `RESTOCK` en la **misma transacción**. | `200` con `{ productCode, quantity, stock, message }` · `400` si `quantity` falta o no es positivo · `404` si el producto no existe |
 
+El tope de items por página del catálogo es configurable con la propiedad
+`inventory.pagination.max-page-size` (variable de entorno `INVENTORY_MAX_PAGE_SIZE`, valor por
+defecto `100`).
+
 ---
 
 ## 2. Tecnologías y Librerías

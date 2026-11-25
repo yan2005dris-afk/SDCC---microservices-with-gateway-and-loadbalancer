@@ -55,3 +55,8 @@ management:
       # servicio completo (fallo en cascada). /actuator/health sigue mostrando la BD.
       probes:
         enabled: true
+
+inventory:
+  pagination:
+    # Tope de items por página del catálogo: las peticiones con size mayor se truncan.
+    max-page-size: ${INVENTORY_MAX_PAGE_SIZE:100}

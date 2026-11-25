@@ -571,12 +571,12 @@ controller/ApiExceptionHandler    400 / 422 / 502 / 503 + Retry-After, formato {
 > La alternativa válida es **no implementarla** y recortar el PRD §3 en B8. Conviene decidirlo en equipo antes de empezar.
 
 ### Checklist
-- [x] `GET /api/inventory?page=0&size=20`: catálogo paginado (`Pageable`, `size` máximo 100) con `Page<ProductResponse>`. Implementado en B6-01 con el sobre `PagedResponse<ProductResponse>` (`content`, `totalElements`, `totalPages`, `currentPage`, `size`), que reproduce el JSON documentado en el ODD; el `Page` nativo de Spring expone `number` en lugar de `currentPage`.
+- [x] `GET /api/inventory?page=0&size=20`: catálogo paginado (`Pageable`, `size` máximo 100) con `Page<ProductResponse>`. Implementado en B6-01 con el sobre `PagedResponse<ProductResponse>` (`content`, `totalElements`, `totalPages`, `currentPage`, `size`), que reproduce el JSON documentado en el ODD; el `Page` nativo de Spring expone `number` en lugar de `currentPage`. El tope de página es configurable por `inventory.pagination.max-page-size` (`INVENTORY_MAX_PAGE_SIZE`, por defecto `100`), ajuste posterior a la revisión con `ocr review` del 2026-11-25.
 - [x] `PUT /api/inventory/{productCode}/stock {quantity}`: reposición atómica + movimiento `RESTOCK`. Implementado en B6-02.
 - [x] Tests `@WebMvcTest` y de servicio. Además: test JPA del `UPDATE` atómico y `InventoryRestockIT` contra PostgreSQL real (rollback del stock si falla el insert del movimiento).
 - [x] Documentar en el README que el endpoint de reposición no tiene autenticación, de acuerdo con la invariante "sin autenticación". Sección "API de Inventario (sin autenticación)".
 
-**Estado:** B6 verificado (2026-11-25). B6-01 ✅ PASS y B6-02 ✅ PASS; `mvn verify -pl inventory-service` en verde contra PostgreSQL real (67 unit + 18 IT). Reportes en `odd/verification/`.
+**Estado:** B6 verificado (2026-11-25). B6-01 ✅ PASS y B6-02 ✅ PASS; `mvn verify -pl inventory-service` en verde contra PostgreSQL real (68 unit + 18 IT). Reportes en `odd/verification/`.
 
 ---
 
