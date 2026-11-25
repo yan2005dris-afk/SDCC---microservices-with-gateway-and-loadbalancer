@@ -30,6 +30,16 @@
   - test nuevo: con `inventory.pagination.max-page-size=2`, una petición con `size=50` se trunca a 2.
 - `README.md`: nota de la propiedad configurable.
 
+## Segunda pasada (tras aplicar el hallazgo 2)
+
+Sesión `54b6da2e-ebe8-4924-bb61-e144fb7b4892` (`develop..HEAD`, 10 archivos, **1 comentario**).
+
+| # | Archivo | Severidad | Hallazgo | Triaje | Resolución |
+|---|---|---|---|---|---|
+| 4 | `controller/InventoryController.java:99` | security · medium | El endpoint de reposición no valida `quantity`; un valor negativo podría llegar a la lógica de negocio. Sugerencia: `Math.max(0, request.quantity())` | **Rechazado (falso positivo)** | `RestockRequest.quantity` es `Integer` con `@NotNull` y `@Positive` (`dto/RestockRequest.java`), y el controlador aplica `@Valid @RequestBody`: los valores `null`, `0` y negativos se rechazan con `400` antes de llegar al servicio. Cubierto por `restockRejectsMissingQuantity` y `restockRejectsNonPositiveQuantity` (`InventoryRestockControllerTest`). La sugerencia además degradaría la validación: `Math.max(0, ...)` convertiría un negativo en `0`, que también es inválido. |
+
+El hallazgo 2 (tope de página hardcodeado) ya no aparece: queda confirmado como resuelto.
+
 ## Verificación
 
 | Comprobación | Resultado |
@@ -44,6 +54,7 @@ Entorno IT: Docker rootless (`DOCKER_HOST=unix:///tmp/rdl/docker.sock`), receta 
 
 ## Veredicto
 
-**PASS.** 1 de 3 hallazgos corregido (mantenibilidad, severidad baja); los 2 restantes se
-descartaron por ser falsos positivos verificados contra el código y los esquemas de base de datos.
-Sin observaciones de correctitud, seguridad ni rendimiento pendientes.
+**PASS.** En total se recibieron 4 hallazgos en 2 pasadas: 1 corregido (mantenibilidad, severidad
+baja) y 3 descartados por ser falsos positivos verificados contra el código, los esquemas de base
+de datos y la cobertura de tests. Sin observaciones de correctitud, seguridad ni rendimiento
+pendientes.
