@@ -3,6 +3,7 @@
 **Feature:** ODD — B6-01: Catálogo Paginado (INV-07)
 **Spec:** `odd/archive/B6-01-inventory-catalog.md`
 **Rework brief:** `odd/verification/B6-01-rework-brief.md`
+**Verification:** `odd/verification/B6-01-verification-2026-11-25.md`, `odd/verification/B6-01-rework-verification-2026-11-25.md`
 **Branch:** `brydyan/feature/inventory-stock-mov-restock`
 **Status:** implemented; unit suite green (58 tests); integration verify still blocked by missing Docker
 
@@ -56,7 +57,9 @@ Testcontainers: "Could not find a valid Docker environment". Missing to close Do
 - `d97f717` docs(odd): record B6-01 implementation progress
 - `79d798c` test(inventory): cover requested page number in catalog endpoint
 - `9e50b5e` fix(inventory): validate catalog sort properties against allowlist
-- docs(odd): update B6-01 apply progress with verify results (this file)
+- `a3993e1` docs(odd): update B6-01 apply progress with verify results
+- `59cae46` docs(odd): record rework review assessment
+- `781ee7b` docs(odd): add B6-01 verification artifacts (this file, brief and verification reports)
 
 ## Gaps / Notes
 
