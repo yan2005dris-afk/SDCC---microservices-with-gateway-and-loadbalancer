@@ -2,6 +2,7 @@ package com.distribuidos.order.controller;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -17,8 +18,13 @@ import com.distribuidos.order.datasource.RoutedResult;
 import com.distribuidos.order.datasource.health.ReplicaStatusView;
 import com.distribuidos.order.dto.OrderItemResponse;
 import com.distribuidos.order.dto.OrderResponse;
+import com.distribuidos.order.loadbalancer.InventoryContractException;
+import com.distribuidos.order.loadbalancer.InventoryUnavailableException;
+import com.distribuidos.order.loadbalancer.ProductNotFoundException;
+import com.distribuidos.order.loadbalancer.StockUnavailableException;
 import com.distribuidos.order.observability.InstanceIdentity;
 import com.distribuidos.order.service.OrderCommandService;
+import com.distribuidos.order.service.OrderCreation;
 import com.distribuidos.order.service.OrderQueryService;
 import com.distribuidos.order.service.OrderRejectedException;
 import java.math.BigDecimal;
@@ -119,7 +125,8 @@ class OrderControllerTest {
 
   @Test
   void createReturns201FromPrimary() throws Exception {
-    when(commandService.createOrder(any())).thenReturn(order(5L, "Juan"));
+    when(commandService.createOrder(any(), isNull()))
+        .thenReturn(OrderCreation.created(order(5L, "Juan")));
 
     mvc.perform(
             post("/api/orders")
@@ -132,8 +139,8 @@ class OrderControllerTest {
 
   @Test
   void createReturns400WithExistingErrorFormatWhenRejected() throws Exception {
-    when(commandService.createOrder(any()))
-        .thenThrow(new OrderRejectedException("Stock insuficiente"));
+    when(commandService.createOrder(any(), any()))
+        .thenThrow(new StockUnavailableException("PROD-001", 2));
 
     mvc.perform(
             post("/api/orders")
@@ -141,6 +148,68 @@ class OrderControllerTest {
                 .content("{\"productCode\":\"PROD-001\",\"quantity\":999,\"unitPrice\":10.00}"))
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.error").value("Stock insuficiente"));
+  }
+
+  @Test
+  void retryWithSameIdempotencyKeyReturns200() throws Exception {
+    when(commandService.createOrder(any(), eq("key-1")))
+        .thenReturn(OrderCreation.replayed(order(5L, "Juan")));
+
+    mvc.perform(
+            post("/api/orders")
+                .header("Idempotency-Key", "key-1")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"productCode\":\"PROD-001\",\"quantity\":1}"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.id").value(5));
+  }
+
+  @Test
+  void unknownProductReturns422() throws Exception {
+    when(commandService.createOrder(any(), any())).thenThrow(new ProductNotFoundException("X"));
+
+    mvc.perform(
+            post("/api/orders")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"productCode\":\"X\",\"quantity\":1}"))
+        .andExpect(status().isUnprocessableEntity())
+        .andExpect(jsonPath("$.error").value("Producto no existe en inventario"));
+  }
+
+  @Test
+  void inventoryUnavailableReturns503WithRetryAfter() throws Exception {
+    when(commandService.createOrder(any(), any()))
+        .thenThrow(new InventoryUnavailableException("down", false, null));
+
+    mvc.perform(
+            post("/api/orders")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"productCode\":\"PROD-001\",\"quantity\":1}"))
+        .andExpect(status().isServiceUnavailable())
+        .andExpect(header().string("Retry-After", "2"))
+        .andExpect(header().exists("X-Instance-Id"));
+  }
+
+  @Test
+  void inventoryContractErrorReturns502() throws Exception {
+    when(commandService.createOrder(any(), any()))
+        .thenThrow(new InventoryContractException("bad", null));
+
+    mvc.perform(
+            post("/api/orders")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"productCode\":\"PROD-001\",\"quantity\":1}"))
+        .andExpect(status().isBadGateway());
+  }
+
+  @Test
+  void incompleteRequestReturns400() throws Exception {
+    when(commandService.createOrder(any(), any()))
+        .thenThrow(new OrderRejectedException("Datos incompletos para crear orden"));
+
+    mvc.perform(post("/api/orders").contentType(MediaType.APPLICATION_JSON).content("{}"))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.error").value("Datos incompletos para crear orden"));
   }
 
   @Test

@@ -62,12 +62,20 @@ public record ReserveStockRequest(
 
 ## Definition of Done
 
-- [ ] `pom.xml` incluye `spring-boot-starter-validation`
-- [ ] DTO creado con `@NotBlank`, `@NotNull`, `@Positive`
-- [ ] Excepciones de dominio creadas
-- [ ] Controller usa DTO, no `Map<String, Object>`
-- [ ] Tests unitarios pasan: validación type mismatch → 400
-- [ ] `mvn spotless:apply && mvn verify -pl inventory-service` pasa
+- [x] `pom.xml` incluye `spring-boot-starter-validation`
+- [x] DTO creado con `@NotBlank`, `@NotNull`, `@Positive`
+- [x] Excepciones de dominio creadas
+- [x] Controller usa DTO, no `Map<String, Object>`
+- [x] Tests unitarios pasan: validación type mismatch → 400
+- [x] `mvn spotless:apply && mvn verify -pl inventory-service` pasa
+
+> **DoD marcado 2026-11-24** durante la verificación `03-verify-odd` de B4-01 (resultado inicial: **PASS con WARN**).
+> **WARN cerrado 2026-11-24 11:05** → veredicto final **PASS**: (b) los números de test se corrigieron el mismo día
+> (ver nota en el apply-progress) y (a) la falta de test para `@NotNull` quedó cubierta por **B4-09** (verificado
+> **PASS**): al quitar el `@NotNull` de `quantity`, la suite actual **falla** (2 errores en
+> `InventoryControllerTest`), o sea que el hueco ya no existe.
+> El WARN original no venía de esta lista: venía de (a) falta de test para `@NotNull` y (b) números de test incorrectos en
+> `B4-01-apply-progress.md`. Ambos quedan trackeados en **B4-09**.
 
 ---
 

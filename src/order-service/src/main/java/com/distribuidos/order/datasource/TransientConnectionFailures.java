@@ -3,6 +3,7 @@ package com.distribuidos.order.datasource;
 import java.sql.SQLException;
 import java.sql.SQLNonTransientConnectionException;
 import java.sql.SQLTransientConnectionException;
+import java.util.Set;
 import org.hibernate.exception.JDBCConnectionException;
 import org.springframework.transaction.CannotCreateTransactionException;
 
@@ -18,6 +19,15 @@ public final class TransientConnectionFailures {
 
   /** Clase SQLState estándar (SQL:2011) para "connection exception". */
   private static final String CONNECTION_EXCEPTION_SQLSTATE_CLASS = "08";
+
+  /**
+   * SQLState de PostgreSQL cuando el servidor se apaga o cae con la conexión abierta (clase 57,
+   * "operator intervention"): {@code 57P01} admin_shutdown, {@code 57P02} crash_shutdown
+   * ("unexpected postmaster exit") y {@code 57P03} cannot_connect_now (arrancando o apagándose). No
+   * son de la clase {@code 08}, pero el nodo no está disponible; Hikari también los trata como
+   * conexión perdida.
+   */
+  private static final Set<String> SERVER_SHUTDOWN_SQLSTATES = Set.of("57P01", "57P02", "57P03");
 
   private static final int MAX_CAUSE_DEPTH = 16;
 
@@ -50,6 +60,7 @@ public final class TransientConnectionFailures {
     }
     return error instanceof SQLException sql
         && sql.getSQLState() != null
-        && sql.getSQLState().startsWith(CONNECTION_EXCEPTION_SQLSTATE_CLASS);
+        && (sql.getSQLState().startsWith(CONNECTION_EXCEPTION_SQLSTATE_CLASS)
+            || SERVER_SHUTDOWN_SQLSTATES.contains(sql.getSQLState()));
   }
 }

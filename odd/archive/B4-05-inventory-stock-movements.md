@@ -103,17 +103,24 @@ WHERE reference_order_number IS NOT NULL;
 
 ## Definition of Done
 
-- [ ] `StockMovement` entity creada con `reference_order_number`, `movement_type`
-- [ ] Índice único en SQL aplicado
-- [ ] `InventoryReservationService` inserta `StockMovement(RESERVATION)` en la misma transacción
-- [ ] `POST /release` creado e idempotente
-- [ ] Dos `/reserve` del mismo `orderNumber` → segundo retorna 200, stock solo decrementó una vez
-- [ ] Dos `/release` del mismo `orderNumber` → ambas retornan 200
-- [ ] Tests pasan
-- [ ] `mvn verify -pl inventory-service` pasa
+- [x] `StockMovement` entity creada con `reference_order_number`, `movement_type`
+- [x] Índice único en SQL aplicado
+- [x] `InventoryReservationService` inserta `StockMovement(RESERVATION)` en la misma transacción
+- [x] `POST /release` creado e idempotente
+- [x] Dos `/reserve` del mismo `orderNumber` → segundo retorna 200, stock solo decrementó una vez
+- [x] Dos `/release` del mismo `orderNumber` → ambas retornan 200
+- [x] Tests pasan
+- [x] `mvn verify -pl inventory-service` pasa
 
 ---
 
 ## Log
+
+**L3:** 2026-11-24 12:45 — Verificación `03-verify-odd` de bloque: **PASS**. Los tres hallazgos del FAIL
+anterior (idempotencia solo por `orderNumber`, guard de `release` sin test, ITs nunca ejecutados) están cerrados
+por B4-08 + B4-11 + B4-12, verificados contra Postgres 15 real. La batería de mutaciones confirma que los guards
+están fijados por pruebas (`M1` guard de release, `M10` lock de fila, `M7`/`M11` flags del `@Modifying`) y que el
+índice único parcial está en el DDL de producción (`docker/postgres/02-init-schemas.sql:67`), en el esquema de test
+y en el script de migración. Evidencia completa en `odd/verification/B4-verification-2026-11-24.md`.
 
 **L1:** 2026-11-23 23:43 — B4-05 creado. StockMovement + /release. Resuelve INV-06.

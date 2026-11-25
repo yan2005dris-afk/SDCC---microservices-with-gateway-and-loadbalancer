@@ -12,7 +12,7 @@ import org.springframework.stereotype.Repository;
 public interface InventoryProductRepository extends JpaRepository<InventoryProduct, Long> {
   Optional<InventoryProduct> findByProductCode(String productCode);
 
-  @Modifying
+  @Modifying(clearAutomatically = true, flushAutomatically = true)
   @Query(
       """
       UPDATE InventoryProduct p
@@ -24,7 +24,7 @@ public interface InventoryProductRepository extends JpaRepository<InventoryProdu
       """)
   int reserveAtomically(@Param("code") String productCode, @Param("qty") int quantity);
 
-  @Modifying
+  @Modifying(clearAutomatically = true, flushAutomatically = true)
   @Query(
       """
       UPDATE InventoryProduct p
@@ -32,7 +32,7 @@ public interface InventoryProductRepository extends JpaRepository<InventoryProdu
              p.reservedStock = p.reservedStock - :qty,
              p.version = p.version + 1,
              p.updatedAt = CURRENT_TIMESTAMP
-       WHERE p.productCode = :code
+       WHERE p.productCode = :code AND p.reservedStock >= :qty
       """)
   int releaseAtomically(@Param("code") String productCode, @Param("qty") int quantity);
 }
