@@ -11,6 +11,7 @@ import com.distribuidos.inventory.model.InventoryProduct;
 import com.distribuidos.inventory.observability.InstanceIdentity;
 import com.distribuidos.inventory.repository.InventoryProductRepository;
 import com.distribuidos.inventory.service.InventoryReservationService;
+import com.distribuidos.inventory.service.InventoryRestockService;
 import java.math.BigDecimal;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -34,6 +35,8 @@ class InventoryCatalogControllerTest {
   @MockitoBean private InventoryProductRepository repository;
 
   @MockitoBean private InventoryReservationService reservationService;
+
+  @MockitoBean private InventoryRestockService restockService;
 
   @Test
   void listProductsReturnsPagedProductResponse() throws Exception {

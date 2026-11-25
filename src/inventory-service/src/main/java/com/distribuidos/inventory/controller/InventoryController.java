@@ -5,9 +5,12 @@ import com.distribuidos.inventory.dto.ProductResponse;
 import com.distribuidos.inventory.dto.ReleaseResponse;
 import com.distribuidos.inventory.dto.ReleaseStockRequest;
 import com.distribuidos.inventory.dto.ReserveStockRequest;
+import com.distribuidos.inventory.dto.RestockRequest;
+import com.distribuidos.inventory.dto.RestockResponse;
 import com.distribuidos.inventory.exception.ProductNotFoundException;
 import com.distribuidos.inventory.repository.InventoryProductRepository;
 import com.distribuidos.inventory.service.InventoryReservationService;
+import com.distribuidos.inventory.service.InventoryRestockService;
 import jakarta.validation.Valid;
 import java.util.List;
 import java.util.Set;
@@ -28,11 +31,15 @@ public class InventoryController {
 
   private final InventoryProductRepository repository;
   private final InventoryReservationService reservationService;
+  private final InventoryRestockService restockService;
 
   public InventoryController(
-      InventoryProductRepository repository, InventoryReservationService reservationService) {
+      InventoryProductRepository repository,
+      InventoryReservationService reservationService,
+      InventoryRestockService restockService) {
     this.repository = repository;
     this.reservationService = reservationService;
+    this.restockService = restockService;
   }
 
   @GetMapping
@@ -82,5 +89,11 @@ public class InventoryController {
   public ResponseEntity<ReleaseResponse> releaseStock(
       @Valid @RequestBody ReleaseStockRequest request) {
     return ResponseEntity.ok().body(reservationService.releaseStock(request.orderNumber()));
+  }
+
+  @PutMapping("/{productCode}/stock")
+  public RestockResponse restockProduct(
+      @PathVariable String productCode, @Valid @RequestBody RestockRequest request) {
+    return restockService.restockProduct(productCode, request.quantity());
   }
 }
