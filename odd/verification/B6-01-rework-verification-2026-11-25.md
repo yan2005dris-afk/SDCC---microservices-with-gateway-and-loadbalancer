@@ -7,7 +7,7 @@
 **Base del rework:** `d97f717` · **HEAD:** `59cae46`
 **Fecha:** 2026-11-25
 **Entorno:** JDK 21, Maven 3.10.0, Docker NO disponible
-**Veredicto:** ⚠️ **WARN** — rework correcto y completo en código; queda 1 DoD pendiente por entorno (Docker)
+**Veredicto:** ✅ **PASS** — rework completo y `mvn verify` verde contra PostgreSQL real (cierre 2026-11-25, ver §8)
 
 > Nota de alcance: la ruta invocada (`verification/B6-01-rework-brief.md`) es el brief de rework,
 > no un ODD con `proposal/design/specs/tasks`. La verificación se hizo contra el brief (3 tareas: A, B, C)
@@ -20,7 +20,7 @@
 | Tarea | Estado | Evidencia verificada |
 |---|---|---|
 | A — cerrar mutación M8 (`page > 0`) | [x] | Test `listProductsUsesRequestedPageNumber` añadido en `InventoryCatalogControllerTest.java`. **Mutante reproducido por el verificador**: parcheando `pageable.getPageNumber()` → `0`, ese test falla (`Actual invocations have different arguments`) y el resto no. Mutante revertido, el código en HEAD usa `pageable.getPageNumber()`. |
-| B — cerrar `mvn verify` | [ ] | **Bloqueado por entorno.** Docker ausente (`Could not find a valid Docker environment`). `mvn verify` corre los 58 tests unitarios en verde y solo rompe en `InventoryReservationIT` con `IllegalStateException: Los tests de integración ... requieren un PostgreSQL real`. Coherente con lo declarado en apply-progress; el DoD sigue `[ ]` correctamente, sin marcar lo no verificado. |
+| B — cerrar `mvn verify` | [x] | **Cerrado 2026-11-25.** Se levantó un daemon Docker **rootless** (rootlesskit 3.3.0 + slirp4netns 1.3.7, `--storage-driver=vfs`, `DOCKER_HOST=unix://$XDG_RUNTIME_DIR/docker.sock`), porque esta máquina no permite arrancar el daemon del sistema sin root. Con él: `mvn verify` → **BUILD SUCCESS**, `InventoryReservationIT` **14/14 verde contra PostgreSQL 15 real** (`postgres:15-alpine` vía Testcontainers), fase unitaria verde. El bloque de código del catálogo no cambió con B6-02 (`git diff 152314e..HEAD` solo añade el endpoint de restock), así que la evidencia aplica a B6-01. Detalle en §8. |
 | C — allowlist de `sort` | [x] | `InventoryController.resolveSort()` filtra por `SORTABLE_PROPERTIES`; si no queda ninguna válida → `Sort.by("productCode")` (200, no 500). Opción elegida: **filtrar**, documentada en apply-progress. Tests: `listProductsIgnoresUnknownSortProperty` y `listProductsKeepsOnlyKnownSortProperties`. **Mutante reproducido por el verificador**: revirtiendo el filtro a passthrough, fallan exactamente esos 2 tests. |
 
 **Scope respetado.** Solo se tocaron los 3 archivos permitidos por el brief:
@@ -94,20 +94,63 @@ anterior al brief (**00:16:08**): no es producto de este rework.
    `a3993e1` con el texto "this file"). Un commit más en la lista, nada más.
 3. **Allowlist no cubre `id` ni `reservedStock`.** El cliente no puede ordenar por esas columnas.
    Coherente con la allowlist propuesta en el brief; si se consideran útiles, añadirlas (con test).
-4. **El DoD de `mvn verify` sigue abierto** y solo puede cerrarse en un entorno con Docker o un
-   PostgreSQL accesible (CI con Docker sirve). No es un defecto de código: el IT aborta por diseño
-   cuando no hay Docker, con mensaje explícito.
+4. **El DoD de `mvn verify` quedó cerrado** el 2026-11-25 (ver §8): daemon Docker rootless local.
+   En CI el mismo comando corre en `ubuntu-latest`, donde Docker está disponible
+   (`.github/workflows/ci-inventory-service.yml`).
 
 ## 7. Veredicto
 
-**⚠️ WARN** — El rework cierra los puntos de código: Tarea A hecha y con mutante reproducido
-independientemente, Tarea C hecha con 2 tests que matan el mutante, 12/12 mutaciones cubiertas,
+**✅ PASS** — El rework cierra los puntos de código (Tarea A con mutante reproducido
+independientemente, Tarea C con 2 tests que matan el mutante), 12/12 mutaciones cubiertas,
 58/58 tests verdes, 0 regresiones, 4 commits conventional sin trailers de IA, sin trabajo lateral.
-El único pendiente es la Tarea B, bloqueada por ausencia de Docker en esta máquina, y correctamente
-declarada como tal en el apply-progress (DoD `[ ]`, sin marcar lo no verificado).
+La Tarea B (integración) se cerró después con evidencia real: ver §8.
 
-**Para pasar a ✅ PASS:**
-1. Ejecutar `mvn clean verify` con Docker disponible y confirmar `BUILD SUCCESS` con
-   `InventoryReservationIT` en verde; marcar el DoD.
-2. Versionar `odd/verification/` (brief + este informe) o quitar la referencia colgante del
-   apply-progress, y añadir `59cae46` a su lista de commits.
+Además, los 2 hallazgos menores de documentación (referencia colgante al brief y commit `59cae46`
+ausente de la lista) quedaron resueltos en los commits `781ee7b` y `152314e`.
+
+---
+
+## 8. Cierre del DoD `mvn verify` (2026-11-25)
+
+El bloqueo era ambiental: el daemon Docker del sistema necesita root y esta máquina no lo da.
+Solución aplicada, **sin tocar ningún archivo del repositorio**: daemon Docker *rootless*.
+
+**Receta (entorno local, sin root):**
+```bash
+# 1. Binarios rootless (paquetes Arch extra, extraídos sin root)
+rootlesskit 3.3.0 + slirp4netns 1.3.7  ->  <dir>/usr/bin
+dockerd-rootless.sh  (moby/moby contrib) + docker 29.9.3 static  ->  <dir>
+
+# 2. Daemon rootless (ruta corta: los sockets unix tienen límite de ~108 chars)
+export PATH=<dir>:<dir>/usr/bin:$PATH
+export XDG_RUNTIME_DIR=/tmp/rdl
+./dockerd-rootless.sh --storage-driver=vfs --data-root=/tmp/rdl/data --exec-root=/tmp/rdl/exec
+
+# 3. Testcontainers lo toma de DOCKER_HOST
+export DOCKER_HOST=unix:///tmp/rdl/docker.sock
+docker pull postgres:15-alpine
+```
+
+**Resultado del comando del DoD:**
+```bash
+cd src/inventory-service
+JAVA_HOME=/usr/lib/jvm/java-21-openjdk mvn verify
+```
+```
+[INFO] Tests run: 67, Failures: 0, Errors: 0, Skipped: 0        <- fase unit (incluye B6-02)
+[INFO] Creating container for image: postgres:15-alpine
+[INFO] Tests run: 14, Failures: 0, Errors: 0, Skipped: 0        <- InventoryReservationIT
+[INFO] BUILD SUCCESS
+```
+
+`InventoryReservationIT` se ejecutó contra **PostgreSQL 15 real** (no H2, no mock): 14 métodos,
+0 fallas, 0 errores.
+
+**Aplica a B6-01:** `git diff 152314e..HEAD -- src/inventory-service` solo añade el endpoint de
+restock de B6-02 (nuevo constructor con `InventoryRestockService` + `PUT /{productCode}/stock`).
+El bloque `listProducts` / `resolveSort` y `InventoryCatalogControllerTest` no cambian, así que la
+evidencia de `mvn verify` cubre el código de B6-01 tal como está en HEAD.
+
+**Nota:** el CI ya ejecuta este mismo comando
+(`.github/workflows/ci-inventory-service.yml` → `mvn -f src/pom.xml verify -pl inventory-service`
+en `ubuntu-latest`), donde Docker está disponible de serie.

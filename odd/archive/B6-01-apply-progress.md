@@ -5,7 +5,7 @@
 **Rework brief:** `odd/verification/B6-01-rework-brief.md`
 **Verification:** `odd/verification/B6-01-verification-2026-11-25.md`, `odd/verification/B6-01-rework-verification-2026-11-25.md`
 **Branch:** `brydyan/feature/inventory-stock-mov-restock`
-**Status:** implemented; unit suite green (58 tests); integration verify still blocked by missing Docker
+**Status:** implemented and verified — `mvn verify` green (unit + integration against real PostgreSQL)
 
 ## Tasks
 
@@ -17,7 +17,7 @@
 ## Rework (B6-01 rework brief)
 
 - [x] Task A — added `listProductsUsesRequestedPageNumber`; M8 mutant (`pageable.getPageNumber()` → `0`) RED, revert GREEN; mutant not left applied
-- [ ] Task B — `mvn clean verify` attempted with JDK 21; blocked: no Docker, `InventoryReservationIT` aborts. DoD item stays unchecked
+- [x] Task B — `mvn clean verify` green with JDK 21 and Docker (rootless daemon: rootlesskit 3.3.0 + slirp4netns 1.3.7, storage-driver `vfs`). Unit phase green, `InventoryReservationIT` 14/14 green against real PostgreSQL 15. DoD item closed
 - [x] Task C — chose **filter** (not 400): unknown sort properties discarded; if none remain, `productCode ASC`; endpoint stays 200. Added tests for `sort=bogus` and mixed `sort=name,desc&sort=bogus,asc`
 
 ## DoD
@@ -26,7 +26,7 @@
 - [x] `size` max 100
 - [x] Order: `productCode ASC` by default, client `sort` preserved (known properties only)
 - [x] Tests: `page=0 size=20`, content correct, `totalElements`, `page>0`
-- [ ] `mvn verify -pl inventory-service` passes — blocked: Docker unavailable, `InventoryReservationIT` requires PostgreSQL/Testcontainers
+- [x] `mvn verify -pl inventory-service` passes — verified 2026-11-25 (JDK 21 + rootless Docker): BUILD SUCCESS, unit phase green, `InventoryReservationIT` 14/14 green against real PostgreSQL 15 (`postgres:15-alpine` via Testcontainers)
 
 ## Tests
 
@@ -44,11 +44,14 @@
 | GREEN M8 (mutant reverted) | 1 | 0 | 0 |
 | RED sort allowlist (unknown/mixed props) | 2 | 2 | 0 |
 | GREEN sort allowlist (filtered) | 2 | 0 | 0 |
+| Verify with real PostgreSQL (`mvn verify`, JDK 21 + rootless Docker) | 67 unit + 14 IT | 0 | 0 |
 
 `mvn test` (from `src/inventory-service`, JDK 21): 58 tests, 0 failures, 0 errors.
-`mvn clean verify` (from `src/inventory-service`, JDK 21): unit phase 58 tests green; fails in
-`InventoryReservationIT` with "Los tests de integración de inventory-service requieren un PostgreSQL real (Docker en ejecución o un Postgres accesible)".
-Testcontainers: "Could not find a valid Docker environment". Missing to close DoD: Docker daemon or reachable PostgreSQL for the IT.
+`mvn clean verify` (from `src/inventory-service`, JDK 21): **BUILD SUCCESS**. Unit phase green;
+`InventoryReservationIT` 14/14 green against a real PostgreSQL 15 container (`postgres:15-alpine`).
+The counts in the "Verify" row above (67 unit) already include the B6-02 restock tests that landed
+on this branch afterwards; the B6-01 subset is the 58 unit tests recorded in the previous row.
+`InventoryReservationIT` was executed twice: 1 test class, 14 test methods, 0 failures, 0 errors.
 
 ## Commits
 
@@ -69,6 +72,8 @@ Testcontainers: "Could not find a valid Docker environment". Missing to close Do
 - Build requires JDK 21 here: default JDK 25 makes Byte Buddy/Mockito fail with "Java 25 (69) is not supported by the current version of Byte Buddy" (pre-existing, reproduced on base with 25 errors).
 - RDD assess (`gentle-ai review assess --base-ref 281621d --json`): `risk=medium`, `review_due=false`, `reason=under_budget`. No review started.
 - RDD assess for rework (`--base-ref d97f717`, untracked verification/task files excluded): `risk=medium`, `review_due=false`, `reason=under_budget`. No review started.
+- The DoD `mvn verify` was closed on 2026-11-25 with a **rootless Docker daemon** because this machine has no root access to start the system daemon: `rootlesskit` 3.3.0 + `slirp4netns` 1.3.7 (Arch `extra` packages extracted without root), `dockerd-rootless.sh` from moby/moby, `--storage-driver=vfs`, socket at `$XDG_RUNTIME_DIR/docker.sock` (`DOCKER_HOST=unix://$XDG_RUNTIME_DIR/docker.sock`). Testcontainers picks it up from `DOCKER_HOST`. No repository file was changed to achieve this; it is only an environment recipe.
+- CI already covers the same command: `.github/workflows/ci-inventory-service.yml` runs `mvn -f src/pom.xml verify -pl inventory-service` on `ubuntu-latest`, where Docker is available.
 - Risk: none (additive endpoint and sort filtering; existing `GET /{productCode}`, `/reserve`, `/release` behavior covered by unchanged tests).
 
 Ready for QA review or merge once integration environment has Docker/PostgreSQL.
