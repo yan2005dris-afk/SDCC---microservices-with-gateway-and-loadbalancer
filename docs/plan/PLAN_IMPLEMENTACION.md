@@ -492,7 +492,7 @@ observability/CorrelationIdFilter, observability/InstanceIdentity, observability
 
 **Tareas:** ORD-06, ORD-07, `Idempotency-Key`, ajustes de B4 (bloqueo redundante, `release` tipado, campo `message`) · **Base:** `develop` con B2, B3 y B4 · **Afecta:** P04
 
-> **Estado:** ✅ verificado en el clúster (P04, 400/422, 503 + `Retry-After`, `Idempotency-Key` 201→200 con el stock descontado una vez, `release` idempotente). Tests escritos y compilados; **pendiente ejecutarlos** (casillas de Tests).
+> **Estado:** ✅ verificado en el clúster (P04, 400/422, 503 + `Retry-After`, `Idempotency-Key` 201→200 con el stock descontado una vez, `release` idempotente). Tests en verde en el CI de `order-service` e `inventory-service` (`0d88cb1`).
 
 ### Objetivo
 Que el precio y el nombre del producto vengan de inventario, que la llamada entre servicios tenga timeouts y códigos HTTP correctos, que se compense la reserva cuando el pedido no llega a registrarse, y que un reintento del cliente no duplique pedidos.
@@ -550,11 +550,11 @@ controller/ApiExceptionHandler    400 / 422 / 502 / 503 + Retry-After, formato {
 - [x] Inventario: sin bloqueo redundante y `ReleaseResponse` tipado.
 
 ### Tests
-- [ ] `LoadBalancedInventoryStockClientTest` (`MockRestServiceServer`): 200, 400 por stock (`message`), 400 de validación → contrato, 404, 5xx, timeout, conexión rechazada, cuerpo incompleto, `release` 200/404/5xx.
-- [ ] `OrderCommandServiceTest`: precio de inventario, sin stock, producto inexistente, timeout → compensa, inaccesible → no compensa, fallo al persistir → compensa, compensación fallida, `Idempotency-Key` (reintento y concurrencia).
-- [ ] `OrderControllerTest`: 201, 200 con clave repetida, 400, 422, 502, 503 + `Retry-After`.
-- [ ] `OrderReadRoutingIT`: el pedido guardado usa el precio de inventario aunque el cliente envíe otro.
-- [ ] Inventario: `InventoryReservationServiceTest`, `InventoryControllerTest` y `InventoryReservationIT` sin el bloqueo y con `ReleaseResponse`.
+- [x] `LoadBalancedInventoryStockClientTest` (`MockRestServiceServer`): 200, 400 por stock (`message`), 400 de validación → contrato, 404, 5xx, timeout, conexión rechazada, cuerpo incompleto, `release` 200/404/5xx.
+- [x] `OrderCommandServiceTest`: precio de inventario, sin stock, producto inexistente, timeout → compensa, inaccesible → no compensa, fallo al persistir → compensa, compensación fallida, `Idempotency-Key` (reintento y concurrencia).
+- [x] `OrderControllerTest`: 201, 200 con clave repetida, 400, 422, 502, 503 + `Retry-After`.
+- [x] `OrderReadRoutingIT`: el pedido guardado usa el precio de inventario aunque el cliente envíe otro.
+- [x] Inventario: `InventoryReservationServiceTest`, `InventoryControllerTest` y `InventoryReservationIT` sin el bloqueo y con `ReleaseResponse`.
 
 ### Verificación manual
 - [x] P04: pedido con `unitPrice` falso → se guarda con el `unit_price` de `inventory_db`.
