@@ -6,7 +6,7 @@
 **Commits verificados:** `58601ef`, `1fdb907`, `616d1a2`, `266749c`, `b390391`, `377fe9c` (base `152314e`)
 **Fecha:** 2026-11-25
 **Entorno:** JDK 21, Maven 3.10.0, Docker rootless local (`DOCKER_HOST=unix:///tmp/rdl/docker.sock`)
-**Veredicto:** ⚠️ **WARN** — implementación correcta y DoD completo; 2 huecos de cobertura de tests (no de código)
+**Veredicto:** ✅ **PASS** — implementación correcta, DoD completo y huecos de cobertura cerrados con `InventoryRestockIT` (ver §10)
 
 ---
 
@@ -86,9 +86,9 @@ El ODD no declara lista de mutaciones; se derivaron de S1 + DoD.
 | M13 | `repository.save()` en vez del UPDATE atómico | ✅ | `verify(repository, never()).save(any(InventoryProduct.class))` |
 | M14 | movimiento con `save()` en vez del insert nativo | ✅ | `verify(stockMovementRepository, never()).save(any(StockMovement.class))` |
 | M15 | `updatedAt` no se refresca | ❌ | ninguna aserción sobre `updated_at` |
-| M16 | **atomicidad real: el UPDATE no se revierte si el insert del movimiento falla** | ❌ *(cubierto solo por guard arquitectónico: la anotación `@Transactional`; la prueba de rollback real la hizo el verificador, no está en el repo)* | falta un IT committed |
+| M16 | **atomicidad real: el UPDATE no se revierte si el insert del movimiento falla** | ✅ | `InventoryRestockIT.restockRollsBackStockWhenMovementInsertFails` — **mutante reproducido por el verificador**: sin `@Transactional` el IT falla (3 de 4 tests) |
 
-**Cobertura: 14/16.** Dos huecos, ambos de **cobertura de tests**, ninguno de comportamiento.
+**Cobertura: 16/16.** Los dos huecos iniciales (M15, M16) se cerraron con `InventoryRestockIT` (ver §10).
 
 ## 5. Calidad de tests y regresiones
 
@@ -133,6 +133,7 @@ Un commit por unidad de trabajo, mensajes claros, sin trailers de co-autoría de
 + controller/InventoryRestockControllerTest.java   (nuevo, 4 tests)
 + service/InventoryRestockServiceTest.java         (nuevo, 3 tests)
 + repository/InventoryRestockRepositoryJpaTest.java(nuevo, 2 tests)
++ it/InventoryRestockIT.java                 (nuevo, 4 tests, agregado al cerrar el WARN — ver §10)
 ~ controller/InventoryControllerTest.java           (+3, @MockitoBean nuevo)
 ~ controller/InventoryCatalogControllerTest.java   (+3, @MockitoBean nuevo)
 ```
@@ -158,26 +159,44 @@ Sin trabajo lateral. 323 líneas, 1 borrado (firma del constructor).
 
 ## 9. Veredicto
 
-**⚠️ WARN** — La implementación es **correcta**: 5/5 tasks, 6/6 DoD (incluido `mvn verify`, que el
-verificador cerró con Docker rootless: 67 unit + 14 IT verdes contra PostgreSQL real), 14/16
-mutaciones cubiertas, 0 regresiones, Spotless limpio, commits conventional sin trailers de IA, sin
-trabajo lateral. El verificador confirmó además, end-to-end contra Postgres real, el incremento de
-stock, el movimiento `RESTOCK`, el 404 exacto y la atomicidad del par UPDATE+INSERT.
+**✅ PASS** — La implementación es **correcta**: 5/5 tasks, 6/6 DoD (incluido `mvn verify`, cerrado por
+el verificador con Docker rootless: 67 unit + 18 IT verdes contra PostgreSQL real), **16/16
+mutaciones cubiertas**, 0 regresiones, Spotless limpio, commits conventional sin trailers de IA, sin
+trabajo lateral. El verificador confirmó end-to-end contra Postgres real el incremento de stock, el
+movimiento `RESTOCK`, el 404 exacto y la atomicidad del par UPDATE+INSERT.
 
-El WARN no es por código: es por **cobertura**. Las dos piezas que fijan el DoD "Stock incrementó" y
-"Movimiento RESTOCK insertado" solo están probadas con mocks; el IT versionado no toca la reposición.
+El WARN inicial no era por código: era por **cobertura** (M15 y M16). Ambos huecos quedaron cerrados
+con el IT que se describe en §10.
 
-**Rework recomendado (para pasar a ✅ PASS):**
-1. Añadir un IT de integración para la reposición (PostgreSQL real, Testcontainers), con al menos:
-   - `PUT /api/inventory/PROD-A/stock {quantity:25}` → 200, `stock` en BD = 75, `version` = 1 y una
-     fila `{movement_type=RESTOCK, quantity=25, reference_order_number=null}`.
-   - Segunda reposición → `stock` = 85 y **2** movimientos (protege contra una regresión de deduplicación).
-   - Producto inexistente → 404 con el `ProblemDetail` exacto y **0** movimientos.
-   - Atomicidad: forzando el fallo del insert del movimiento (p. ej. `@MockitoSpyBean` sobre
-     `StockMovementRepository`), el `stock` debe volver al valor previo y no debe quedar ningún
-     movimiento (el verificador ya lo comprobó así: `stock=50`, `movements=0`).
-   - El `INSERT` nativo con `reference_order_number = NULL` queda así cubierto contra Postgres real.
-2. Assertar `updated_at` cambia tras la reposición (M15).
-3. Cerrar el ítem del `apply-progress`: `mvn verify` ya pasa (el verificador lo ejecutó); marcar `[x]`
-   con la evidencia.
-4. Decidir qué hacer con `odd/tasks/B6-02-inventory-restock.md` (duplicado sin trackear).
+---
+
+## 10. Cierre del WARN — `InventoryRestockIT` (2026-11-25)
+
+**Archivo:** `src/inventory-service/src/test/java/com/distribuidos/inventory/it/InventoryRestockIT.java`
+
+Clase de integración nueva, siguiendo la convención de `InventoryReservationIT`: Testcontainers con
+`postgres:15-alpine`, `withInitScript("inventory-schema.sql")`, `@SpringBootTest` con puerto aleatorio,
+`@DynamicPropertySource` con las mismas 6 propiedades, y un bloque `static` que aborta con el mensaje
+explícito cuando no hay Docker (mismo contrato que el IT existente).
+
+**4 casos:**
+
+| Test | Qué fija |
+|---|---|
+| `restockIncreasesStockAndRecordsRestockMovement` | 200 + JSON exacto (4 campos), `stock` 50→75, `reserved_stock`=0, `version`=1, `updated_at` refrescado, y una fila `{RESTOCK, 25, reference_order_number IS NULL}` |
+| `consecutiveRestocksAreNotDeduplicated` | 2ª reposición: `stock`=85 y **2** movimientos (protege contra una regresión de deduplicación por `ON CONFLICT`) |
+| `restockUnknownProductReturns404AndRecordsNoMovement` | 404 con el `ProblemDetail` exacto (type/title/status/detail/instance) y **0** movimientos, stock intacto |
+| `restockRollsBackStockWhenMovementInsertFails` | Con `@MockitoSpyBean` sobre `StockMovementRepository` forzando el fallo del insert: 500 y **rollback** — `stock` vuelve a 50, `version`=0, 0 movimientos |
+
+**Mutantes reproducidos por el verificador contra este IT (RED demonstration):**
+- Sin `@Transactional` en el servicio → **3 de 4 tests fallan** (el `UPDATE` deja de ser transaccional).
+- `reference_order_number` fijo (`"RESTOCK-" + code`) en lugar de `null` → **2 tests fallan**
+  (`expected: 2 but was: 1` por deduplicación, y `expected: null but was: "RESTOCK-PROD-A"`).
+
+**Gates de CI re-verificados:** `mvn -f src/pom.xml spotless:check -pl inventory-service` → 36 archivos
+limpios (el archivo nuevo se formateó con `spotless:apply`); `checkstyle:check` → 16 warnings,
+`failOnViolation=false`, BUILD SUCCESS; `mvn clean verify` → **BUILD SUCCESS**, 67 unit + 18 IT.
+
+**Pendiente resuelto:** `odd/tasks/B6-02-inventory-restock.md` era un duplicado byte a byte de
+`odd/archive/B6-02-inventory-restock.md` (que es la ubicación canónica y versionada de todos los ODD
+del repo). Se eliminó la copia sin trackear para dejar una sola fuente de verdad.

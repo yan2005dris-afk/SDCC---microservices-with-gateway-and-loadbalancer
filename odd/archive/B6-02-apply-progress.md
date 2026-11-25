@@ -3,7 +3,7 @@
 **Feature:** ODD — B6-02: Reposición de Stock (INV-07)
 **Spec:** `odd/archive/B6-02-inventory-restock.md`
 **Branch:** `brydyan/feature/inventory-stock-mov-restock`
-**Status:** implemented and verified — `mvn verify` green (unit + integration against real PostgreSQL); 2 test-coverage gaps pending (see `odd/verification/B6-02-verification-2026-11-25.md`)
+**Status:** implemented and verified — `mvn verify` green (unit + integration against real PostgreSQL); coverage gaps closed with `InventoryRestockIT` (see `odd/verification/B6-02-verification-2026-11-25.md`)
 
 ## Tasks
 
@@ -11,7 +11,7 @@
 - [x] B — Created `InventoryRestockService#restockProduct(code, qty)`; transactional, returns documented `RestockResponse`, throws 404 with exact detail
 - [x] C — Added `InventoryProductRepository#restockAtomically(code, qty)`; `UPDATE stock = stock + qty`, version bump, `updatedAt = CURRENT_TIMESTAMP`
 - [x] D — Added `PUT /api/inventory/{productCode}/stock` to `InventoryController`
-- [x] E — Tests: successful restock, 404, RESTOCK movement recorded, request validation
+- [x] E — Tests: successful restock, 404, RESTOCK movement recorded, request validation, plus `InventoryRestockIT` (PostgreSQL real): stock/version/updated_at, movimiento RESTOCK, no deduplicación, 404 sin movimiento y rollback del stock si falla el insert del movimiento
 
 ## DoD
 
@@ -31,6 +31,7 @@
 | After C (`1fdb907`) | 60 | 0 | 0 |
 | After B (`616d1a2`) | 63 | 0 | 0 |
 | After D/E (`266749c`) | 67 | 0 | 0 |
+| After `InventoryRestockIT` (unit / IT) | 67 unit + 18 IT | 0 | 0 |
 | RED C — no `restockAtomically` | 2 | 0 | 2 (compile) |
 | GREEN C — repository method added | 2 | 0 | 0 |
 | RED B — no service/response type | 3 | 0 | 3 (compile) |
@@ -39,6 +40,10 @@
 | GREEN D — endpoint added | 4 | 0 | 0 |
 
 `mvn test` (from `src/inventory-service`, JDK 21): 67 tests, 0 failures, 0 errors.
+`InventoryRestockIT` (failsafe, `mvn verify`): 4 tests contra PostgreSQL 15 real — incremento de stock y
+`version`, `updated_at` refrescado, movimiento `RESTOCK` con `reference_order_number` NULL, segunda
+reposición **no** deduplicada (2 movimientos), 404 exacto sin movimiento, y rollback del stock cuando
+falla el insert del movimiento (`@MockitoSpyBean` sobre `StockMovementRepository`).
 
 `mvn clean verify` (from `src/inventory-service`, JDK 21): **BUILD SUCCESS**. Unit phase 67 green;
 `InventoryReservationIT` 14/14 green against a real PostgreSQL 15 container (`postgres:15-alpine`).
@@ -67,6 +72,7 @@ Differential check: existing `InventoryControllerTest` + `InventoryCatalogContro
 - DoD command `mvn verify -pl inventory-service` cannot run from repo root: root has no pom. Ran `mvn clean verify` from `src/inventory-service`, same module.
 - Build requires JDK 21 here: default JDK 25 breaks Byte Buddy/Mockito with "Java 25 (69) is not supported by the current version of Byte Buddy".
 - RDD assess (`--base-ref 152314e`, untracked `odd/tasks/` excluded): `risk=medium`, `review_due=false`, `reason=under_budget`. No review started.
+- `InventoryRestockIT` added after the first verification (WARN): the unit tests mock the repository, so the atomicity of UPDATE + movement INSERT was only guarded by an annotation check. The new IT closes that gap against real PostgreSQL.
 - Risk: none (additive endpoint, additive constructor, new service/DTOs; existing behavior pinned by unchanged tests and differential check).
 
 Ready for QA review or merge once integration environment has Docker/PostgreSQL.
