@@ -247,7 +247,9 @@ services:
       interval: 10s
       timeout: 5s
       retries: 3
-      start_period: 90s
+      # Arranque de la JVM: en frío y con todo el clúster iniciando a la vez se midieron 130 s.
+      # Los fallos dentro de este margen no cuentan y el servicio pasa a healthy en cuanto responde.
+      start_period: 180s
     ports:
       - target: 8081
         published: 8081
@@ -292,7 +294,9 @@ services:
       interval: 10s
       timeout: 5s
       retries: 3
-      start_period: 90s
+      # Arranque de la JVM: en frío y con todo el clúster iniciando a la vez se midieron 130 s.
+      # Los fallos dentro de este margen no cuentan y el servicio pasa a healthy en cuanto responde.
+      start_period: 180s
     ports:
       - target: 8082
         published: 8082

@@ -1,5 +1,6 @@
 package com.distribuidos.inventory.controller;
 
+import com.distribuidos.inventory.dto.ReleaseResponse;
 import com.distribuidos.inventory.dto.ReleaseStockRequest;
 import com.distribuidos.inventory.dto.ReserveStockRequest;
 import com.distribuidos.inventory.exception.ProductNotFoundException;
@@ -39,7 +40,8 @@ public class InventoryController {
   }
 
   @PostMapping("/release")
-  public ResponseEntity<?> releaseStock(@Valid @RequestBody ReleaseStockRequest request) {
+  public ResponseEntity<ReleaseResponse> releaseStock(
+      @Valid @RequestBody ReleaseStockRequest request) {
     return ResponseEntity.ok().body(reservationService.releaseStock(request.orderNumber()));
   }
 }

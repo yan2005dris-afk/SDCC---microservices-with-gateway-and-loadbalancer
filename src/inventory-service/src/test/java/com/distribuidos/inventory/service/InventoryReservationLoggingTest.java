@@ -54,7 +54,6 @@ class InventoryReservationLoggingTest {
 
   @Test
   void successfulReserveLogsOkWithRemainingStock() {
-    when(repository.findByProductCodeForUpdate("PROD-001")).thenReturn(Optional.of(product(50)));
     when(stockMovementRepository.insertIfAbsent("PROD-001", "RESERVATION", 5, "ORD-001"))
         .thenReturn(1);
     when(repository.reserveAtomically("PROD-001", 5)).thenReturn(1);
@@ -75,7 +74,6 @@ class InventoryReservationLoggingTest {
 
   @Test
   void rejectedReserveLogsInsufficientWithAvailableStock() {
-    when(repository.findByProductCodeForUpdate("PROD-001")).thenReturn(Optional.of(product(5)));
     when(stockMovementRepository.insertIfAbsent("PROD-001", "RESERVATION", 5, "ORD-001"))
         .thenReturn(1);
     when(repository.reserveAtomically("PROD-001", 5)).thenReturn(0);
@@ -97,7 +95,6 @@ class InventoryReservationLoggingTest {
 
   @Test
   void idempotentReplayLogsOkWithoutDecrementingAgain() {
-    when(repository.findByProductCodeForUpdate("PROD-001")).thenReturn(Optional.of(product(45)));
     when(stockMovementRepository.findByReferenceOrderNumberAndTypeAndProductCode(
             "ORD-001", MovementType.RESERVATION, "PROD-001"))
         .thenReturn(Optional.of(movement()));
