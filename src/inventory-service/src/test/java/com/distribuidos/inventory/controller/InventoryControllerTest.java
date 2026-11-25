@@ -23,6 +23,7 @@ import com.distribuidos.inventory.exception.StockUnavailableException;
 import com.distribuidos.inventory.observability.InstanceIdentity;
 import com.distribuidos.inventory.repository.InventoryProductRepository;
 import com.distribuidos.inventory.service.InventoryReservationService;
+import com.distribuidos.inventory.service.InventoryRestockService;
 import com.distribuidos.inventory.web.ApiExceptionHandler;
 import java.math.BigDecimal;
 import java.util.List;
@@ -50,6 +51,8 @@ class InventoryControllerTest {
   @MockitoBean private InventoryProductRepository repository;
 
   @MockitoBean private InventoryReservationService reservationService;
+
+  @MockitoBean private InventoryRestockService restockService;
 
   @Test
   void rejectsNonNumericQuantityWithProblemDetail() throws Exception {

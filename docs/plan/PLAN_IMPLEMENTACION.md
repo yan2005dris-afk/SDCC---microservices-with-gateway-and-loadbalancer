@@ -571,10 +571,12 @@ controller/ApiExceptionHandler    400 / 422 / 502 / 503 + Retry-After, formato {
 > La alternativa válida es **no implementarla** y recortar el PRD §3 en B8. Conviene decidirlo en equipo antes de empezar.
 
 ### Checklist
-- [ ] `GET /api/inventory?page=0&size=20`: catálogo paginado (`Pageable`, `size` máximo 100) con `Page<ProductResponse>`.
-- [ ] `PUT /api/inventory/{productCode}/stock {quantity}`: reposición atómica + movimiento `RESTOCK`.
-- [ ] Tests `@WebMvcTest` y de servicio.
-- [ ] Documentar en el README que el endpoint de reposición no tiene autenticación, de acuerdo con la invariante "sin autenticación".
+- [x] `GET /api/inventory?page=0&size=20`: catálogo paginado (`Pageable`, `size` máximo 100) con `Page<ProductResponse>`. Implementado en B6-01 con el sobre `PagedResponse<ProductResponse>` (`content`, `totalElements`, `totalPages`, `currentPage`, `size`), que reproduce el JSON documentado en el ODD; el `Page` nativo de Spring expone `number` en lugar de `currentPage`. El tope de página es configurable por `inventory.pagination.max-page-size` (`INVENTORY_MAX_PAGE_SIZE`, por defecto `100`), ajuste posterior a la revisión con `ocr review` del 2026-11-25.
+- [x] `PUT /api/inventory/{productCode}/stock {quantity}`: reposición atómica + movimiento `RESTOCK`. Implementado en B6-02.
+- [x] Tests `@WebMvcTest` y de servicio. Además: test JPA del `UPDATE` atómico y `InventoryRestockIT` contra PostgreSQL real (rollback del stock si falla el insert del movimiento).
+- [x] Documentar en el README que el endpoint de reposición no tiene autenticación, de acuerdo con la invariante "sin autenticación". Sección "API de Inventario (sin autenticación)".
+
+**Estado:** B6 verificado (2026-11-25). B6-01 ✅ PASS y B6-02 ✅ PASS; `mvn verify -pl inventory-service` en verde contra PostgreSQL real (68 unit + 18 IT). Reportes en `odd/verification/`.
 
 ---
 
@@ -708,7 +710,7 @@ Marca cada tarea cuando esté **implementada y verificada en su rama**.
 - [x] **INV-04** Formato de error unificado (`ProblemDetail`) y 404 — *B4*
 - [x] **INV-05** `/reserve` devuelve `unitPrice` y `productName` — *B4*
 - [x] **INV-06** `stock_movement_history` + `POST /release` idempotente — *B4*
-- [ ] **INV-07** Catálogo y reposición (o recorte del PRD) — *B6 / B8*
+- [x] **INV-07** Catálogo y reposición (o recorte del PRD) — *B6 / B8* — implementado en B6 (B6-01 catálogo paginado, B6-02 reposición atómica) y verificado el 2026-11-25
 
 ### Scripts y colecciones — B7 `test/experiment-scripts`
 - [ ] **DOC-08** Scripts P03, P06, P07, P08 + conteo de errores en P02
