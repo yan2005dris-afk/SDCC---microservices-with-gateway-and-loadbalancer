@@ -63,6 +63,7 @@ on this branch afterwards; the B6-01 subset is the 58 unit tests recorded in the
 - `a3993e1` docs(odd): update B6-01 apply progress with verify results
 - `59cae46` docs(odd): record rework review assessment
 - `781ee7b` docs(odd): add B6-01 verification artifacts (this file, brief and verification reports)
+- `ae81e5b` docs(odd): close B6-01 verify DoD with real PostgreSQL evidence
 
 ## Gaps / Notes
 
