@@ -52,7 +52,7 @@ Differential check: existing `InventoryControllerTest` + `InventoryCatalogContro
 - `1fdb907` feat(inventory): add atomic restock stock update
 - `616d1a2` feat(inventory): add atomic restock service
 - `266749c` feat(inventory): expose atomic stock restock endpoint
-- (this commit) docs(odd): create B6-02 apply progress
+- `b390391` docs(odd): create B6-02 apply progress
 
 ## Gaps / Notes
 
