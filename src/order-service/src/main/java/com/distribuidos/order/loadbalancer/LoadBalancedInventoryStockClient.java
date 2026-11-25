@@ -4,7 +4,11 @@ import com.distribuidos.order.loadbalancer.dto.InventoryReleaseRequest;
 import com.distribuidos.order.loadbalancer.dto.InventoryReserveRequest;
 import com.distribuidos.order.loadbalancer.dto.InventoryReserveResponse;
 import java.net.ConnectException;
+import java.net.NoRouteToHostException;
+import java.net.PortUnreachableException;
+import java.net.SocketTimeoutException;
 import java.net.UnknownHostException;
+import java.util.Locale;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.HttpClientErrorException;
@@ -64,7 +68,10 @@ public class LoadBalancedInventoryStockClient implements InventoryStockClient {
     } catch (RuntimeException ex) {
       throw translate("reserve", ex);
     }
-    if (body == null || !body.isAvailable() || body.unitPrice() == null || body.productName() == null) {
+    if (body == null
+        || !body.isAvailable()
+        || body.unitPrice() == null
+        || body.productName() == null) {
       throw new InventoryContractException("Respuesta de reserva incompleta: " + body, null);
     }
     return new ReservedStock(productCode, body.productName(), body.unitPrice());
@@ -100,7 +107,8 @@ public class LoadBalancedInventoryStockClient implements InventoryStockClient {
   }
 
   private static RuntimeException translate(String operation, RuntimeException ex) {
-    if (ex instanceof HttpStatusCodeException status && !status.getStatusCode().is5xxServerError()) {
+    if (ex instanceof HttpStatusCodeException status
+        && !status.getStatusCode().is5xxServerError()) {
       return new InventoryContractException(
           "inventory-service respondió " + status.getStatusCode() + " a " + operation, ex);
     }
@@ -119,14 +127,30 @@ public class LoadBalancedInventoryStockClient implements InventoryStockClient {
     return new InventoryUnavailableException("Error llamando a inventory-service", true, ex);
   }
 
+  /**
+   * La conexión no llegó a establecerse: la petición no salió y no hay reserva que compensar. Con
+   * {@code docker stop}, mientras Eureka aún anuncia la instancia, el intento falla con "Connect
+   * timed out" o "No route to host", no con {@code ConnectException}. Un timeout de <b>lectura</b>
+   * sí cuenta como petición enviada.
+   */
   private static boolean neverSent(Throwable error) {
     Throwable current = error;
     for (int depth = 0; current != null && depth < MAX_CAUSE_DEPTH; depth++) {
-      if (current instanceof ConnectException || current instanceof UnknownHostException) {
+      if (current instanceof ConnectException
+          || current instanceof NoRouteToHostException
+          || current instanceof PortUnreachableException
+          || current instanceof UnknownHostException
+          || isConnectTimeout(current)) {
         return true;
       }
       current = current.getCause();
     }
     return false;
+  }
+
+  private static boolean isConnectTimeout(Throwable error) {
+    return error instanceof SocketTimeoutException
+        && error.getMessage() != null
+        && error.getMessage().toLowerCase(Locale.ROOT).contains("connect");
   }
 }

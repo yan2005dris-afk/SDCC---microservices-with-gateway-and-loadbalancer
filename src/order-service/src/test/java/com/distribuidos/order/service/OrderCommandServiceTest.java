@@ -205,8 +205,7 @@ class OrderCommandServiceTest {
 
   @Test
   void incompleteRequestIsRejectedWithoutCallingInventory() {
-    assertThatThrownBy(
-            () -> service.createOrder(new CreateOrderRequest(null, null, null, 0), null))
+    assertThatThrownBy(() -> service.createOrder(new CreateOrderRequest(null, null, null, 0), null))
         .isInstanceOf(OrderRejectedException.class)
         .hasMessage("Datos incompletos para crear orden");
     verify(inventory, never()).reserve(anyString(), anyInt(), anyString());

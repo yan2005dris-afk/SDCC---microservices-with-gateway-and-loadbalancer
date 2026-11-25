@@ -242,7 +242,11 @@ public class OrderCommandService {
 
   private static String randomOrderNumber() {
     return ORDER_NUMBER_PREFIX
-        + UUID.randomUUID().toString().replace("-", "").substring(0, RANDOM_SUFFIX_LENGTH).toUpperCase();
+        + UUID.randomUUID()
+            .toString()
+            .replace("-", "")
+            .substring(0, RANDOM_SUFFIX_LENGTH)
+            .toUpperCase();
   }
 
   /**
@@ -253,7 +257,8 @@ public class OrderCommandService {
   static String orderNumberFor(String idempotencyKey) {
     try {
       byte[] hash =
-          MessageDigest.getInstance("SHA-256").digest(idempotencyKey.getBytes(StandardCharsets.UTF_8));
+          MessageDigest.getInstance("SHA-256")
+              .digest(idempotencyKey.getBytes(StandardCharsets.UTF_8));
       return ORDER_NUMBER_PREFIX
           + HexFormat.of().formatHex(hash).substring(0, KEY_HASH_LENGTH).toUpperCase();
     } catch (NoSuchAlgorithmException ex) {

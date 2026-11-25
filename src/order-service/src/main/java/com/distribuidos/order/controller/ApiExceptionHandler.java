@@ -75,8 +75,8 @@ public class ApiExceptionHandler {
   }
 
   /**
-   * Producto inexistente: {@code 422}. El recurso {@code /orders} existe; lo que no es procesable es
-   * la referencia al producto.
+   * Producto inexistente: {@code 422}. El recurso {@code /orders} existe; lo que no es procesable
+   * es la referencia al producto.
    *
    * @param ex excepción.
    * @return respuesta de error.

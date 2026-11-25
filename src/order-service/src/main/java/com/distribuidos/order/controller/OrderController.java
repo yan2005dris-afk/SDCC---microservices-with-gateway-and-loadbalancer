@@ -92,8 +92,9 @@ public class OrderController {
   }
 
   /**
-   * Crea un pedido. El precio y el nombre salen de inventario (ORD-06). Con {@code Idempotency-Key},
-   * un reintento devuelve el pedido ya creado ({@code 200}) sin reservar otra vez.
+   * Crea un pedido. El precio y el nombre salen de inventario (ORD-06). Con {@code
+   * Idempotency-Key}, un reintento devuelve el pedido ya creado ({@code 200}) sin reservar otra
+   * vez.
    *
    * @param request datos del pedido.
    * @param idempotencyKey clave de idempotencia opcional.

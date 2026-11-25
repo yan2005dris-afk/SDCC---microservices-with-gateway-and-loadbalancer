@@ -1,6 +1,5 @@
 package com.distribuidos.order.dto;
 
-
 /**
  * Solicitud fuertemente tipada para crear un nuevo pedido en {@code POST /api/orders}.
  *
@@ -13,10 +12,7 @@ package com.distribuidos.order.dto;
  * @param quantity cantidad solicitada del producto (mayor a cero).
  */
 public record CreateOrderRequest(
-    String customerName,
-    String customerEmail,
-    String productCode,
-    Integer quantity) {
+    String customerName, String customerEmail, String productCode, Integer quantity) {
 
   private static final String DEFAULT_CUSTOMER_NAME = "Cliente General";
   private static final String DEFAULT_CUSTOMER_EMAIL = "cliente@distribuidos.com";
@@ -27,10 +23,7 @@ public record CreateOrderRequest(
    * @return {@code true} si código y cantidad son válidos; {@code false} en caso contrario.
    */
   public boolean hasRequiredFields() {
-    return productCode != null
-        && !productCode.isBlank()
-        && quantity != null
-        && quantity > 0;
+    return productCode != null && !productCode.isBlank() && quantity != null && quantity > 0;
   }
 
   /**

@@ -14,6 +14,7 @@ import static org.springframework.test.web.client.response.MockRestResponseCreat
 
 import java.math.BigDecimal;
 import java.net.ConnectException;
+import java.net.NoRouteToHostException;
 import java.net.SocketTimeoutException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -128,6 +129,24 @@ class LoadBalancedInventoryStockClientTest {
         .isInstanceOfSatisfying(
             InventoryUnavailableException.class,
             ex -> assertThat(ex.reservationMayExist()).isFalse());
+  }
+
+  @Test
+  void connectTimeoutOrNoRouteMeansTheReservationWasNeverSent() {
+    // docker stop: Eureka aún anuncia la instancia y la conexión no se rechaza, expira.
+    server
+        .expect(requestTo(RESERVE))
+        .andRespond(withException(new SocketTimeoutException("Connect timed out")));
+    server
+        .expect(requestTo(RESERVE))
+        .andRespond(withException(new NoRouteToHostException("No route to host")));
+
+    for (int i = 0; i < 2; i++) {
+      assertThatThrownBy(() -> client.reserve("PROD-001", 1, "ORD-1"))
+          .isInstanceOfSatisfying(
+              InventoryUnavailableException.class,
+              ex -> assertThat(ex.reservationMayExist()).isFalse());
+    }
   }
 
   @Test
