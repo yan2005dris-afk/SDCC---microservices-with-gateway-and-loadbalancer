@@ -3,7 +3,7 @@
 > **Fuente de verdad:** [Entregables/pdf/informe.pdf](../../Entregables/pdf/informe.pdf) (código fuente en [informe.tex](../../Entregables/pdf/informe.tex)).
 > Este archivo es un resumen para leer desde GitHub. Si difiere del PDF, vale el PDF.
 
-El PDF contiene, para cada escenario P01–P08, objetivo, procedimiento, resultado esperado, resultado obtenido, evidencia y análisis; el registro de verificaciones C01–C21 y los límites de la solución.
+El PDF contiene introducción, arquitectura y metodología; para cada escenario P01–P08, objetivo, procedimiento, resultado esperado, resultado obtenido, evidencia y análisis (con gráficos de P02, P03 y P06); la verificación sobre la versión final; conclusiones y limitaciones, y en el anexo las verificaciones complementarias C01–C21.
 
 ## Entorno
 
