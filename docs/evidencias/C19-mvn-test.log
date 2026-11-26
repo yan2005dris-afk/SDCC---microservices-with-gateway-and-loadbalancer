@@ -1,0 +1,39 @@
+C19 — mvn -B test (imagen maven:3.9-eclipse-temurin-21), 2026-11-25, árbol de trabajo local
+Resultado: BUILD SUCCESS — api-gateway 7, order-service 65, inventory-service 52 (124 tests, 0 fallos, 0 errores, 0 omitidos); eureka-server sin tests.
+Los WARN db.route ... result=FAILED son fallos inducidos por los propios tests de failover.
+
+[INFO] Reactor Build Order:
+[INFO] Building sdcc-microservices-parent 0.0.1-SNAPSHOT                  [1/5]
+[INFO] Building eureka-server 0.0.1-SNAPSHOT                              [2/5]
+[INFO] Building api-gateway 0.0.1-SNAPSHOT                                [3/5]
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.436 s -- in com.distribuidos.gateway.filter.LoggingAndTracingGlobalFilterTest
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.020 s -- in com.distribuidos.gateway.loadbalancer.RoundRobinLoadBalancerDistributionTest
+[INFO] Tests run: 7, Failures: 0, Errors: 0, Skipped: 0
+[INFO] Building order-service 0.0.1-SNAPSHOT                              [4/5]
+[INFO] Tests run: 10, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 3.140 s -- in com.distribuidos.order.controller.OrderControllerTest
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.070 s -- in com.distribuidos.order.datasource.HealthAwareReplicaSelectorTest
+[INFO] Tests run: 11, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.100 s -- in com.distribuidos.order.datasource.RoutedReadExecutorTest
+[INFO] Tests run: 8, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.011 s -- in com.distribuidos.order.datasource.TransientConnectionFailuresTest
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.142 s -- in com.distribuidos.order.datasource.health.DatabaseNodesHealthIndicatorTest
+[INFO] Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.009 s -- in com.distribuidos.order.datasource.health.PostgresReplicaProbeTest
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.704 s -- in com.distribuidos.order.datasource.health.ReplicaHealthMonitorTest
+[INFO] Tests run: 6, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.009 s -- in com.distribuidos.order.datasource.health.ReplicaHealthRegistryTest
+[INFO] Tests run: 6, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.148 s -- in com.distribuidos.order.lifecycle.DiscoveryDrainLifecycleTest
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.068 s -- in com.distribuidos.order.loadbalancer.LoadBalancedInventoryStockClientTest
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.091 s -- in com.distribuidos.order.observability.CorrelationIdFilterTest
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.144 s -- in com.distribuidos.order.service.OrderCommandServiceTest
+[INFO] Tests run: 65, Failures: 0, Errors: 0, Skipped: 0
+[INFO] Building inventory-service 0.0.1-SNAPSHOT                          [5/5]
+[INFO] Tests run: 25, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 3.335 s -- in com.distribuidos.inventory.controller.InventoryControllerTest
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.070 s -- in com.distribuidos.inventory.observability.CorrelationIdFilterTest
+[INFO] Tests run: 6, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 2.245 s -- in com.distribuidos.inventory.repository.InventoryProductRepositoryJpaTest
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.092 s -- in com.distribuidos.inventory.service.InventoryReservationLoggingTest
+[INFO] Tests run: 13, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.081 s -- in com.distribuidos.inventory.service.InventoryReservationServiceTest
+[INFO] Tests run: 52, Failures: 0, Errors: 0, Skipped: 0
+[INFO] Reactor Summary for sdcc-microservices-parent 0.0.1-SNAPSHOT:
+[INFO] sdcc-microservices-parent .......................... SUCCESS [  0.001 s]
+[INFO] eureka-server ...................................... SUCCESS [ 19.299 s]
+[INFO] api-gateway ........................................ SUCCESS [  5.624 s]
+[INFO] order-service ...................................... SUCCESS [ 11.711 s]
+[INFO] inventory-service .................................. SUCCESS [  7.462 s]
+[INFO] BUILD SUCCESS

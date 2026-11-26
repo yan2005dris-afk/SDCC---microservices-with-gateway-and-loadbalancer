@@ -34,7 +34,11 @@
     { "id": "ord-inv", "from": "order1", "to": "inventory", "label": "RPC Stock Check", "variant": "dashed" },
     { "id": "ord1-pri", "from": "order1", "to": "pg-primary", "label": "Writes: orders_db" },
     { "id": "ord2-pri", "from": "order2", "to": "pg-primary", "label": "Writes: orders_db" },
-    { "id": "inv-pri", "from": "inventory", "to": "pg-primary", "label": "Isolated: inventory_db", "variant": "dashed" },
+    { "id": "inv-pri", "from": "inventory", "to": "pg-primary", "label": "JDBC · inventory_db" },
+    { "id": "order1-read-replica1", "from": "order1", "to": "pg-replica1", "label": "Ordinary reads · orders_db", "variant": "dashed" },
+    { "id": "order1-read-replica2", "from": "order1", "to": "pg-replica2", "label": "Ordinary reads · orders_db", "variant": "dashed" },
+    { "id": "order2-read-replica1", "from": "order2", "to": "pg-replica1", "label": "Ordinary reads · orders_db", "variant": "dashed" },
+    { "id": "order2-read-replica2", "from": "order2", "to": "pg-replica2", "label": "Ordinary reads · orders_db", "variant": "dashed" },
     { "id": "wal-r1", "from": "pg-primary", "to": "pg-replica1", "label": "WAL Stream", "variant": "emphasis" },
     { "id": "wal-r2", "from": "pg-primary", "to": "pg-replica2", "label": "WAL Stream", "variant": "emphasis" }
   ],

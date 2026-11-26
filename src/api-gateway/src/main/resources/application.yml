@@ -77,6 +77,21 @@ spring:
                   factor: 2
                   basedOnPreviousValue: false
 
+        # OpenAPI / Swagger UI Docs por microservicio
+        - id: order-service-docs
+          uri: lb://order-service
+          predicates:
+            - Path=/v3/api-docs/orders/**
+          filters:
+            - RewritePath=/v3/api-docs/orders(?<remaining>.*), /v3/api-docs${remaining}
+
+        - id: inventory-service-docs
+          uri: lb://inventory-service
+          predicates:
+            - Path=/v3/api-docs/inventory/**
+          filters:
+            - RewritePath=/v3/api-docs/inventory(?<remaining>.*), /v3/api-docs${remaining}
+
 # Configuración de Resilience4j Circuit Breaker
 resilience4j:
   circuitbreaker:
