@@ -1,10 +1,8 @@
 package com.distribuidos.inventory.repository;
 
 import com.distribuidos.inventory.model.InventoryProduct;
-import jakarta.persistence.LockModeType;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -13,10 +11,6 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface InventoryProductRepository extends JpaRepository<InventoryProduct, Long> {
   Optional<InventoryProduct> findByProductCode(String productCode);
-
-  @Lock(LockModeType.PESSIMISTIC_WRITE)
-  @Query("select p from InventoryProduct p where p.productCode = :productCode")
-  Optional<InventoryProduct> findByProductCodeForUpdate(@Param("productCode") String productCode);
 
   @Modifying(clearAutomatically = true, flushAutomatically = true)
   @Query(
@@ -41,4 +35,15 @@ public interface InventoryProductRepository extends JpaRepository<InventoryProdu
        WHERE p.productCode = :code AND p.reservedStock >= :qty
       """)
   int releaseAtomically(@Param("code") String productCode, @Param("qty") int quantity);
+
+  @Modifying(clearAutomatically = true, flushAutomatically = true)
+  @Query(
+      """
+      UPDATE InventoryProduct p
+         SET p.stock = p.stock + :qty,
+             p.version = p.version + 1,
+             p.updatedAt = CURRENT_TIMESTAMP
+       WHERE p.productCode = :code
+      """)
+  int restockAtomically(@Param("code") String productCode, @Param("qty") int quantity);
 }

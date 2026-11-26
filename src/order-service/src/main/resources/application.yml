@@ -7,6 +7,11 @@ server:
 spring:
   application:
     name: order-service
+  cloud:
+    loadbalancer:
+      cache:
+        # Lista de instancias de inventory-service en caché (por defecto 35 s).
+        ttl: ${SDCC_LOADBALANCER_CACHE_TTL:5s}
   lifecycle:
     # Tiempo máximo para drenar las peticiones en curso.
     timeout-per-shutdown-phase: 20s
@@ -27,6 +32,10 @@ eureka:
       defaultZone: ${EUREKA_CLIENT_SERVICEURL_DEFAULTZONE:http://localhost:8761/eureka/}
     fetch-registry: true
     register-with-eureka: true
+    # Igual que el Gateway: con el valor por defecto (30 s) más la caché del LoadBalancer
+    # (35 s), tras reiniciar inventory-service los pedidos daban 503 "sin instancias"
+    # hasta ~65 s. Con 5 s + 5 s el peor caso baja a ~10 s.
+    registry-fetch-interval-seconds: ${EUREKA_REGISTRY_FETCH_INTERVAL:5}
   instance:
     prefer-ip-address: true
     instance-id: ${INSTANCE_ID:${spring.application.name}:${server.port}}
@@ -57,6 +66,14 @@ logging:
     level: "%5p [cid=%X{correlationId:-} inst=%X{instanceId:-} db=%X{dbNode:-}]"
 
 sdcc:
+  inventory:
+    base-url: ${SDCC_INVENTORY_BASE_URL:http://inventory-service}
+    # Presupuesto de POST /api/orders (timelimiter del Gateway = 3 s):
+    # connect + read (≈ 2 s) + escritura en el primario (write-timeout 1 s) < 3 s.
+    connect-timeout: ${SDCC_INVENTORY_CONNECT_TIMEOUT:500ms}
+    read-timeout: ${SDCC_INVENTORY_READ_TIMEOUT:1500ms}
+  order:
+    write-timeout: ${SDCC_ORDER_WRITE_TIMEOUT:1s}
   datasource:
     username: ${DB_USER:admin}
     password: ${DB_PASSWORD:admin_demo_change_me}

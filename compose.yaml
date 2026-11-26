@@ -126,7 +126,9 @@ services:
       interval: 10s
       timeout: 5s
       retries: 3
-      start_period: 90s
+      # Arranque de la JVM: en frío y con todo el clúster iniciando a la vez se midieron 130 s.
+      # Los fallos dentro de este margen no cuentan y el servicio pasa a healthy en cuanto responde.
+      start_period: 180s
     restart: unless-stopped
     networks:
       - sdcc-network
@@ -152,7 +154,9 @@ services:
       interval: 10s
       timeout: 5s
       retries: 3
-      start_period: 90s
+      # Arranque de la JVM: en frío y con todo el clúster iniciando a la vez se midieron 130 s.
+      # Los fallos dentro de este margen no cuentan y el servicio pasa a healthy en cuanto responde.
+      start_period: 180s
     # Reinicia si el proceso cae; un "docker stop" manual se respeta (P03).
     restart: unless-stopped
     # El Gateway recibe tráfico solo cuando hay instancias de negocio listas.
@@ -195,7 +199,9 @@ services:
       interval: 10s
       timeout: 5s
       retries: 3
-      start_period: 90s
+      # Arranque de la JVM: en frío y con todo el clúster iniciando a la vez se midieron 130 s.
+      # Los fallos dentro de este margen no cuentan y el servicio pasa a healthy en cuanto responde.
+      start_period: 180s
     # Reinicia si el proceso cae; un "docker stop" manual se respeta (P03).
     restart: unless-stopped
     depends_on:
@@ -237,7 +243,9 @@ services:
       interval: 10s
       timeout: 5s
       retries: 3
-      start_period: 90s
+      # Arranque de la JVM: en frío y con todo el clúster iniciando a la vez se midieron 130 s.
+      # Los fallos dentro de este margen no cuentan y el servicio pasa a healthy en cuanto responde.
+      start_period: 180s
     # Reinicia si el proceso cae; un "docker stop" manual se respeta (P03).
     restart: unless-stopped
     depends_on:
@@ -277,7 +285,9 @@ services:
       interval: 10s
       timeout: 5s
       retries: 3
-      start_period: 90s
+      # Arranque de la JVM: en frío y con todo el clúster iniciando a la vez se midieron 130 s.
+      # Los fallos dentro de este margen no cuentan y el servicio pasa a healthy en cuanto responde.
+      start_period: 180s
     # Reinicia si el proceso cae; un "docker stop" manual se respeta (P03).
     restart: unless-stopped
     depends_on:

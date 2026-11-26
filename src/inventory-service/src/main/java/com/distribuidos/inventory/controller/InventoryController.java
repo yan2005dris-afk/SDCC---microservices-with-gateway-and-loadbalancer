@@ -1,11 +1,23 @@
 package com.distribuidos.inventory.controller;
 
+import com.distribuidos.inventory.dto.PagedResponse;
+import com.distribuidos.inventory.dto.ProductResponse;
+import com.distribuidos.inventory.dto.ReleaseResponse;
 import com.distribuidos.inventory.dto.ReleaseStockRequest;
 import com.distribuidos.inventory.dto.ReserveStockRequest;
+import com.distribuidos.inventory.dto.RestockRequest;
+import com.distribuidos.inventory.dto.RestockResponse;
 import com.distribuidos.inventory.exception.ProductNotFoundException;
 import com.distribuidos.inventory.repository.InventoryProductRepository;
 import com.distribuidos.inventory.service.InventoryReservationService;
+import com.distribuidos.inventory.service.InventoryRestockService;
 import jakarta.validation.Valid;
+import java.util.List;
+import java.util.Set;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -13,13 +25,50 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/api/inventory")
 public class InventoryController {
 
+  private static final Set<String> SORTABLE_PROPERTIES =
+      Set.of("productCode", "name", "description", "stock", "unitPrice", "createdAt", "updatedAt");
+
   private final InventoryProductRepository repository;
   private final InventoryReservationService reservationService;
+  private final InventoryRestockService restockService;
+  private final int maxPageSize;
 
   public InventoryController(
-      InventoryProductRepository repository, InventoryReservationService reservationService) {
+      InventoryProductRepository repository,
+      InventoryReservationService reservationService,
+      InventoryRestockService restockService,
+      @Value("${inventory.pagination.max-page-size:100}") int maxPageSize) {
     this.repository = repository;
     this.reservationService = reservationService;
+    this.restockService = restockService;
+    this.maxPageSize = Math.max(1, maxPageSize);
+  }
+
+  @GetMapping
+  public PagedResponse<ProductResponse> listProducts(Pageable pageable) {
+    Sort sort = resolveSort(pageable);
+    Pageable effective =
+        PageRequest.of(
+            pageable.getPageNumber(), Math.min(pageable.getPageSize(), maxPageSize), sort);
+    return PagedResponse.from(
+        repository
+            .findAll(effective)
+            .map(
+                product ->
+                    new ProductResponse(
+                        product.getProductCode(),
+                        product.getName(),
+                        product.getDescription(),
+                        product.getStock(),
+                        product.getUnitPrice())));
+  }
+
+  private static Sort resolveSort(Pageable pageable) {
+    List<Sort.Order> allowed =
+        pageable.getSort().stream()
+            .filter(order -> SORTABLE_PROPERTIES.contains(order.getProperty()))
+            .toList();
+    return allowed.isEmpty() ? Sort.by("productCode") : Sort.by(allowed);
   }
 
   @GetMapping("/{productCode}")
@@ -39,7 +88,14 @@ public class InventoryController {
   }
 
   @PostMapping("/release")
-  public ResponseEntity<?> releaseStock(@Valid @RequestBody ReleaseStockRequest request) {
+  public ResponseEntity<ReleaseResponse> releaseStock(
+      @Valid @RequestBody ReleaseStockRequest request) {
     return ResponseEntity.ok().body(reservationService.releaseStock(request.orderNumber()));
+  }
+
+  @PutMapping("/{productCode}/stock")
+  public RestockResponse restockProduct(
+      @PathVariable String productCode, @Valid @RequestBody RestockRequest request) {
+    return restockService.restockProduct(productCode, request.quantity());
   }
 }

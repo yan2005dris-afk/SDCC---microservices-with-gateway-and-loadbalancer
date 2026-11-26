@@ -15,6 +15,7 @@ import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
+import com.distribuidos.inventory.dto.ReleaseResponse;
 import com.distribuidos.inventory.dto.ReservationResponse;
 import com.distribuidos.inventory.exception.ProductNotFoundException;
 import com.distribuidos.inventory.exception.ReservationNotFoundException;
@@ -22,9 +23,10 @@ import com.distribuidos.inventory.exception.StockUnavailableException;
 import com.distribuidos.inventory.observability.InstanceIdentity;
 import com.distribuidos.inventory.repository.InventoryProductRepository;
 import com.distribuidos.inventory.service.InventoryReservationService;
+import com.distribuidos.inventory.service.InventoryRestockService;
 import com.distribuidos.inventory.web.ApiExceptionHandler;
 import java.math.BigDecimal;
-import java.util.Map;
+import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.slf4j.LoggerFactory;
@@ -49,6 +51,8 @@ class InventoryControllerTest {
   @MockitoBean private InventoryProductRepository repository;
 
   @MockitoBean private InventoryReservationService reservationService;
+
+  @MockitoBean private InventoryRestockService restockService;
 
   @Test
   void rejectsNonNumericQuantityWithProblemDetail() throws Exception {
@@ -190,19 +194,16 @@ class InventoryControllerTest {
   void releaseReturnsRestoredStockResponse() throws Exception {
     when(reservationService.releaseStock("ORD-001"))
         .thenReturn(
-            Map.of(
-                "productCode",
-                "PROD-001",
-                "quantity",
-                5,
-                "message",
-                "Stock liberado exitosamente"));
+            ReleaseResponse.of(
+                "ORD-001", List.of(ReleaseResponse.ReleasedItem.released("PROD-001", 5))));
 
     performRelease("{\"orderNumber\":\"ORD-001\"}")
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.productCode").value("PROD-001"))
         .andExpect(jsonPath("$.quantity").value(5))
-        .andExpect(jsonPath("$.message").value("Stock liberado exitosamente"));
+        .andExpect(jsonPath("$.message").value("Stock liberado exitosamente"))
+        .andExpect(jsonPath("$.orderNumber").value("ORD-001"))
+        .andExpect(jsonPath("$.releases[0].productCode").value("PROD-001"));
 
     verify(reservationService).releaseStock("ORD-001");
   }
