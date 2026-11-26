@@ -28,25 +28,38 @@ Prefijo en Gateway: `/api/orders`
   ```json
   {
     "customerName": "Juan Perez",
+    "customerEmail": "juan@example.invalid",
     "productCode": "PROD-001",
-    "quantity": 2,
-    "unitPrice": 49.99
+    "quantity": 2
   }
   ```
+  El precio no se acepta del cliente: lo fija `inventory-service` al reservar. Un `unitPrice`
+  enviado por clientes antiguos se ignora. Cabecera opcional `Idempotency-Key`: un reintento con
+  la misma clave devuelve `200` con el pedido ya creado, sin reservar stock otra vez.
 - **Response `201 Created`:**
   ```json
   {
     "id": 101,
+    "orderNumber": "ORD-...",
     "customerName": "Juan Perez",
-    "productCode": "PROD-001",
-    "quantity": 2,
-    "totalPrice": 99.98,
+    "customerEmail": "juan@example.invalid",
+    "totalAmount": 3799.98,
     "status": "CONFIRMED",
-    "createdAt": "2026-11-18T16:00:00Z"
+    "createdAt": "2026-11-18T16:00:00Z",
+    "items": [
+      {
+        "id": 1,
+        "productCode": "PROD-001",
+        "productName": "Laptop Dell XPS 15",
+        "quantity": 2,
+        "unitPrice": 1899.99,
+        "subtotal": 3799.98
+      }
+    ]
   }
   ```
 - **Headers devueltos:**
-  - `X-Instance-Id: order-service-instance-1:8081`
+  - `X-Instance-Id: order-service-1:8081`
   - `X-Database-Node: PRIMARY`
 
 ---

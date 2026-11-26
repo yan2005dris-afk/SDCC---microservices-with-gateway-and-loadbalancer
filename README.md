@@ -73,6 +73,21 @@ El sistema implementa un dominio de comercio electrónico ligero compuesto por d
 
 > **Diagrama Interactivo:** Puedes explorar el diagrama interactivo renderizado con Archify en [docs/architecture/architecture.html](docs/architecture/architecture.html) o el diagrama de persistencia en [docs/architecture/stack-diagram-database.html](docs/architecture/stack-diagram-database.html).
 
+### API de Pedidos (vía Gateway `:8080`, sin autenticación)
+
+| Método y ruta | Descripción | Nodo de BD | Respuesta |
+|---|---|---|---|
+| `POST /api/orders` | Crea un pedido. Body `{customerName, customerEmail, productCode, quantity}`; el precio lo fija inventario (un `unitPrice` enviado se ignora). Llama a `inventory-service` por nombre lógico para reservar stock. Cabecera opcional `Idempotency-Key`. | `PRIMARY` | `201` creado · `200` si se repite la misma `Idempotency-Key` · `400` sin stock · `422` producto inexistente · `503` inventario no disponible |
+| `GET /api/orders` | Lista pedidos (lectura ordinaria). | Réplica (round-robin) | `200` · `503` si no hay ningún nodo de lectura |
+| `GET /api/orders/{id}` | Detalle de un pedido. Con `X-Consistency: critical` se lee del primario (*read-your-writes*). | Réplica o `PRIMARY` | `200` · `404` si no existe |
+
+Cabeceras de respuesta útiles para las pruebas:
+
+- `X-Instance-Id`: instancia de `order-service` que atendió (`order-service-1:8081` / `order-service-2:8083`).
+- `X-Database-Node`: nodo de BD usado (`PRIMARY`, `REPLICA_1`, `REPLICA_2`).
+- `X-Replication-Lag-Ms`: lag medido de la réplica, cuando la lectura se sirvió desde una.
+- `X-Correlation-Id`: si se envía en la petición, aparece en los logs de Gateway, Orders e Inventory.
+
 ### API de Inventario (sin autenticación)
 
 > **Ninguno de estos endpoints requiere autenticación ni credenciales.** Es una herramienta interna del
@@ -117,9 +132,9 @@ Para cumplir con la restricción de que `@Transactional(readOnly = true)` no bal
 1. **`DynamicRoutingDataSource` (extiende `AbstractRoutingDataSource`):**
    - Inyecta un mapa con tres fuentes de datos: `PRIMARY`, `REPLICA_1` y `REPLICA_2`.
    - Utiliza `LazyConnectionDataSourceProxy` para aplazar la adquisición de la conexión física hasta que se determine si la transacción es de escritura o lectura.
-2. **`ReplicaLoadBalancer`:**
-   - Distribuye las lecturas ordinarias (`GET /api/orders`) alternadamente en **Round-Robin** entre Réplica 1 y Réplica 2.
-   - Detecta la caída de una réplica (P06) y desvía transparentemente el tráfico a la réplica sana.
+2. **`HealthAwareReplicaSelector` + `RoutedReadExecutor`:**
+   - Distribuyen las lecturas ordinarias (`GET /api/orders`) en **Round-Robin** entre las réplicas aptas (cada instancia de `order-service` lleva su propio contador).
+   - Si una lectura falla por conexión, la réplica se marca `DOWN`, sale de la rotación y la misma lectura se reintenta en la otra réplica (P06). Si no queda ninguna réplica apta, la lectura se sirve desde el primario (`sdcc.datasource.read.fallback-to-primary`, variable `SDCC_READ_FALLBACK_TO_PRIMARY`, activo por defecto).
    - Cuenta con sondeos activos que consideran apta una réplica solo si está en recuperación, el receptor WAL está en `streaming` y el lag medido es conocido y no supera el umbral configurado (5 s por defecto). Un fallo la saca de rotación; vuelve tras dos sondeos sanos consecutivos (P06/P08).
 3. **Consistencia de Lectura Crítica (P07):**
    - Si la petición incluye la cabecera `X-Consistency: critical`, la consulta se enruta directamente al nodo `PRIMARY`, evitando inconsistencias derivadas del *replication lag* tras crear un registro.
@@ -158,6 +173,38 @@ docker compose exec -T postgres-primary sh -lc 'psql -U "$POSTGRES_USER" -d inve
 docker compose exec -T postgres-primary sh -lc 'psql -U "$POSTGRES_USER" -d postgres -c "SELECT application_name, state, sync_state FROM pg_stat_replication ORDER BY application_name;"'
 ```
 Espera a que los servicios con healthcheck estén `healthy`. La consulta de inventario muestra los productos de semilla; la consulta del primario debe mostrar las dos réplicas en `streaming` (replicación asíncrona). No interpretes `Up` por sí solo como disponibilidad funcional.
+
+### Datos de prueba
+
+El primario carga esta semilla en `inventory_db` al crearse el volumen (`docker/postgres/02-init-schemas.sql`):
+
+| Código | Producto | Stock inicial | Precio |
+|---|---|---|---|
+| `PROD-001` | Laptop Dell XPS 15 | 50 | 1899.99 |
+| `PROD-002` | Monitor UltraWide 34" | 30 | 499.50 |
+| `PROD-003` | Teclado Mecánico RGB | 100 | 89.90 |
+| `PROD-004` | Mouse Ergonómico Inalámbrico | 75 | 59.99 |
+| `PROD-005` | Auriculares Noise Cancelling | 40 | 199.00 |
+
+Ejemplos listos para copiar (los datos de cliente son ficticios):
+
+```bash
+# Pedido válido (201, X-Database-Node: PRIMARY)
+curl -i -X POST http://localhost:8080/api/orders \
+  -H 'Content-Type: application/json' -H 'X-Correlation-Id: demo-order-01' \
+  -d '{"customerName":"Cliente Demo","customerEmail":"demo@example.invalid","productCode":"PROD-001","quantity":2}'
+
+# Pedido sin stock (400)
+curl -i -X POST http://localhost:8080/api/orders \
+  -H 'Content-Type: application/json' \
+  -d '{"customerName":"Cliente Demo","customerEmail":"demo@example.invalid","productCode":"PROD-001","quantity":9999}'
+
+# Lectura ordinaria (réplica) y lectura crítica (primario) del pedido creado
+curl -i http://localhost:8080/api/orders
+curl -i -H 'X-Consistency: critical' http://localhost:8080/api/orders/<id>
+```
+
+Las mismas operaciones están en la colección [Bruno](tests/bruno/collection) y en [tests/http/api-tests.http](tests/http/api-tests.http).
 
 ### Paso 5: Visualizar Logs
 ```bash
@@ -203,10 +250,10 @@ El proyecto incluye suites listas para ejecutar en [tests/http/api-tests.http](t
 |---|---|---|---|
 | **P01** | Descubrimiento Dinámico | `curl -H "Accept: application/json" http://localhost:8761/eureka/apps` o abrir `http://localhost:8761`. | Se observan `API-GATEWAY`, `ORDER-SERVICE` (2 instancias) e `INVENTORY-SERVICE` en estado `UP`. |
 | **P02** | Balanceo HTTP (100 reqs) | Confirma ambas instancias `UP` en Eureka y una respuesta HTTP 200 desde cada una a través del Gateway; `UP` por sí solo no confirma que la lista del Gateway se haya propagado. Si hay 503, registra la ventana de arranque y espera la respuesta de ambas antes de medir. Ejecuta `bash scripts/experiments/test-p02-loadbalance.sh`. | El script registra cada código HTTP, instancia, nodo y error; evalúa la distribución observada de las 100 respuestas, sin asumir un reparto exacto. |
-| **P03** | Fallo de Instancia | `docker stop --timeout 40 order-service-1`, envía la tanda del protocolo y luego restaura con `docker start order-service-1`. | Se registran cantidad, códigos HTTP e instancia de cada solicitud durante el fallo y tras restaurar; no se presupone éxito del 100% sin medirlo. |
+| **P03** | Fallo de Instancia | `bash scripts/experiments/test-p03-instance-failover.sh`: tráfico antes, durante y después de `docker stop order-service-1`, y tiempo hasta que la instancia vuelve a responder. | Se registran cantidad, códigos HTTP e instancia de cada solicitud durante el fallo y tras restaurar; no se presupone éxito del 100% sin medirlo. |
 | **P04** | Comunicación Inter-Servicios | Enviar `POST http://localhost:8080/api/orders` con un producto de inventario. | `order-service` invoca a `http://inventory-service/api/inventory/reserve` vía Eureka para validar stock antes de crear. |
 | **P05** | Enrutamiento de BD | Crear un pedido y hacer varios `GET /api/orders`; registra cabeceras. | Comprueba `PRIMARY` en la escritura y mide los nodos devueltos en las lecturas; no presupone alternancia por petición. |
-| **P06** | Fallo de Réplica | `docker stop --timeout 40 postgres-replica1`, consulta `GET /api/orders` y luego restaura con `docker start postgres-replica1`. | Registra respuestas, cabeceras y errores durante el fallo; la réplica restante debe ser la única elegible cuando se detecte la caída. |
+| **P06** | Fallo de Réplica | `bash scripts/experiments/test-p06-replica-failover.sh`: lecturas antes e inmediatamente después de `docker stop postgres-replica1`, logs del selector (`db.route`, `replica.state`) y restauración. | Registra respuestas, cabeceras y errores durante el fallo; la réplica restante debe ser la única elegible cuando se detecte la caída. |
 | **P07** | Consistencia de Lectura | Usa el ID devuelto por el `POST`: `GET /api/orders/{id}` con `X-Consistency: critical`. | Comprueba que la petición devuelve el mismo pedido con `X-Database-Node: PRIMARY`; no afirma garantías más amplias que lo observado. |
 | **P08** | Recuperación de Réplica | `docker start postgres-replica1`; mide hasta salud, WAL `streaming` y reincorporación a lecturas. | Registra el tiempo medido y las cabeceras tras reingreso; la salud Compose por sí sola no prueba que la réplica esté en rotación. |
 
@@ -220,7 +267,8 @@ El proyecto incluye suites listas para ejecutar en [tests/http/api-tests.http](t
 - 📄 [Arquitectura de Base de Datos y Modelo ERD](docs/database/DATABASE_SCHEMA.md)
 - 📄 [Guía de Replicación Física WAL PostgreSQL 17](docs/database/REPLICACION_POSTGRESQL_GUIA.md)
 - 📄 [Protocolo Detallado de Pruebas P01-P08](docs/plan/TEST_PLAN_P01_P08.md)
-- 📄 [Informe experimental P01-P08 y evidencias](docs/plan/INFORME_P01_P08.md)
+- 📕 [Informe de pruebas P01-P08 (PDF entregable)](Entregables/pdf/informe.pdf)
+- 📄 [Informe experimental P01-P08 y evidencias](docs/plan/INFORME_P01_P08.md) · [índice de evidencias](docs/evidencias/README.md)
 - 🎬 [Guion del video demostrativo](docs/plan/GUION_VIDEO.md)
 
 ---
