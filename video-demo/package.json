@@ -1,0 +1,25 @@
+{
+  "name": "sdcc-video-demo",
+  "version": "1.0.0",
+  "scripts": {
+    "start": "npx remotion studio src/index.tsx",
+    "build:full": "npx remotion render src/index.tsx FullPresentation out/full_presentation.mp4",
+    "build:gino": "npx remotion render src/index.tsx GinoLoadBalancer out/gino_loadbalancer.mp4",
+    "build:gino-audio": "npx remotion render src/index.tsx GinoAudioCompleto out/gino_audio_completo_1m29s.mp4",
+    "build:allison": "npx remotion render src/index.tsx AllisonTransactions out/allison_transactions.mp4",
+    "build:andy": "npx remotion render src/index.tsx AndyFailover out/andy_failover.mp4",
+    "build:intro": "npx remotion render src/index.tsx Intro out/intro.mp4",
+    "build:outro": "npx remotion render src/index.tsx Outro out/outro.mp4"
+  },
+  "dependencies": {
+    "framer-motion": "^11.18.2",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "remotion": "^4.0.245"
+  },
+  "devDependencies": {
+    "@remotion/cli": "^4.0.245",
+    "@types/react": "^18.3.18",
+    "typescript": "^5.7.3"
+  }
+}

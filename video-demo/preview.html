@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Previsualización de Video Demo Completo · SDCC</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; }
+    body { background-color: #0b0f19; color: #f8fafc; padding: 30px; display: flex; flex-direction: column; align-items: center; }
+    h1 { margin-bottom: 8px; color: #38bdf8; }
+    p.desc { color: #94a3b8; margin-bottom: 24px; font-size: 16px; text-align: center; }
+    .controls { display: flex; gap: 10px; margin-bottom: 24px; flex-wrap: wrap; justify-content: center; }
+    button {
+      background: #1e293b; color: #f8fafc; border: 1px solid #334155; padding: 10px 18px;
+      font-size: 14px; font-weight: 600; border-radius: 8px; cursor: pointer; transition: all 0.2s;
+    }
+    button:hover, button.active { background: #0284c7; border-color: #38bdf8; }
+    .video-viewport {
+      width: 1050px; height: 590px; border-radius: 14px; overflow: hidden;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.7); border: 1px solid rgba(255,255,255,0.1);
+      position: relative; background: #080c14;
+    }
+    .scene {
+      width: 100%; height: 100%; display: none; flex-direction: column;
+      justify-content: space-between; align-items: center; padding: 40px 60px; text-align: center;
+      position: absolute; top: 0; left: 0;
+    }
+    .scene.active { display: flex; }
+    
+    /* Escena Intro (Yandris) */
+    .intro-scene {
+      background: radial-gradient(ellipse at 50% 20%, #172554 0%, #080c14 70%);
+      animation: fadeIn 0.8s ease-out;
+      justify-content: center !important;
+    }
+    .intro-badge {
+      background: rgba(59, 130, 246, 0.15); border: 1px solid rgba(59, 130, 246, 0.4);
+      border-radius: 9999px; padding: 6px 16px; font-size: 12px; color: #60a5fa;
+      letter-spacing: 0.1em; text-transform: uppercase; font-weight: 700; margin-bottom: 16px;
+    }
+    .intro-title {
+      font-size: 36px; font-weight: 900;
+      background: linear-gradient(to right, #ffffff, #93c5fd, #38bdf8);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      margin-bottom: 12px;
+    }
+
+    /* Escena Gino */
+    .gino-scene {
+      background: radial-gradient(ellipse at 50% 30%, #0c4a6e 0%, #080c14 75%);
+    }
+
+    /* Escena Allison */
+    .allison-scene {
+      background: radial-gradient(ellipse at 50% 30%, #311042 0%, #080c14 75%);
+    }
+
+    /* Escena Andy */
+    .andy-scene {
+      background: radial-gradient(ellipse at 50% 30%, #450a0a 0%, #080c14 75%);
+    }
+
+    /* Escena Outro */
+    .outro-scene {
+      background: radial-gradient(ellipse at 50% 80%, #064e3b 0%, #080c14 70%);
+      justify-content: center !important;
+    }
+
+    .badge {
+      display: inline-block; padding: 6px 16px; border-radius: 9999px; font-size: 13px;
+      font-weight: 700; text-transform: uppercase; margin-bottom: 10px;
+    }
+    .badge-blue { background: rgba(56, 189, 248, 0.15); border: 1px solid rgba(56, 189, 248, 0.4); color: #38bdf8; }
+    .badge-pink { background: rgba(236, 72, 153, 0.15); border: 1px solid rgba(236, 72, 153, 0.4); color: #f472b6; }
+    .badge-red { background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.4); color: #f87171; }
+    .badge-green { background: rgba(52, 211, 153, 0.15); border: 1px solid rgba(52, 211, 153, 0.4); color: #34d399; }
+
+    .node-box {
+      background: #0f172a; border: 2px solid #334155; border-radius: 14px; padding: 18px 24px;
+      box-shadow: 0 10px 20px rgba(0,0,0,0.4);
+    }
+    .node-box.active-green { border-color: #10b981; background: rgba(16, 185, 129, 0.15); box-shadow: 0 0 20px rgba(16, 185, 129, 0.3); }
+    .node-box.active-purple { border-color: #a855f7; background: rgba(168, 85, 247, 0.15); box-shadow: 0 0 20px rgba(168, 85, 247, 0.3); }
+    .node-box.stopped-red { border-color: #ef4444; border-style: dashed; background: rgba(239, 68, 68, 0.15); }
+
+    .pulse { animation: pulseAnim 1.6s infinite ease-in-out; }
+    @keyframes pulseAnim {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.05); }
+      100% { transform: scale(1); }
+    }
+  </style>
+</head>
+<body>
+
+  <h1>Presentación Completa del Demostrativo · SDCC</h1>
+  <p class="desc">Animaciones interactivas de todas las etapas: Arquitectura, Load Balancer, Transacciones Distribuidas y Failover.</p>
+
+  <div class="controls">
+    <button class="active" onclick="switchScene('intro')">1. Intro (Yandris)</button>
+    <button onclick="switchScene('gino')">2. Balanceo de Carga (Gino)</button>
+    <button onclick="switchScene('allison')">3. Reserva & Transacciones (Allison)</button>
+    <button onclick="switchScene('andy')">4. Resiliencia & Failover (Andy)</button>
+    <button onclick="switchScene('outro')">5. Conclusiones (Yandris)</button>
+    <button style="background: #047857;" onclick="playAuto()">▶ Reproducir Todo Continuo</button>
+  </div>
+
+  <div class="video-viewport">
+    <!-- 1. INTRO -->
+    <div id="intro" class="scene intro-scene active">
+      <div class="intro-badge">Sistemas Distribuidos y Computación Paralela</div>
+      <div class="intro-title">Microservicios, Gateway y Balanceo de Carga</div>
+      <p style="color: #94a3b8; font-size: 18px; margin-bottom: 30px;">
+        Demostración Práctica · Resiliencia, Replicación y Enrutamiento Activo
+      </p>
+      <div style="display: flex; gap: 14px; margin-bottom: 25px;">
+        <span style="background: #1e293b; padding: 6px 14px; border-radius: 8px; font-size: 13px; border: 1px solid #334155;">Spring Cloud Gateway :8080</span>
+        <span style="background: #1e293b; padding: 6px 14px; border-radius: 8px; font-size: 13px; border: 1px solid #334155;">Eureka Server :8761</span>
+        <span style="background: #1e293b; padding: 6px 14px; border-radius: 8px; font-size: 13px; border: 1px solid #334155;">PostgreSQL Primary + 2 Réplicas WAL</span>
+      </div>
+      <div style="color: #64748b; font-size: 14px;">Presentación: Yandris Rivera, Gino Bermúdez, Allison Reyes y Andy Alejandro</div>
+    </div>
+
+    <!-- 2. GINO: ARQUITECTURA ARCHIFY + SCRIPT DE CONSOLA P02 -->
+    <div id="gino" class="scene gino-scene">
+      <div style="margin-bottom: 10px;">
+        <div class="badge badge-blue">🎙️ Gino Bermúdez · Prueba P02 · Balanceo HTTP</div>
+        <h2 style="font-size: 26px; font-weight: 900; color: #f8fafc; margin: 2px 0;">Arquitectura Archify & Ejecución del Script P02</h2>
+        <p style="color: #94a3b8; font-size: 13px;">Distribución Round-Robin de 100 peticiones en Gateway y Read-Splitting en Réplicas</p>
+      </div>
+
+      <!-- Panel Doble: Arquitectura a la Izquierda y Terminal a la Derecha -->
+      <div style="display: grid; grid-template-columns: 1fr 1.15fr; gap: 20px; width: 100%; height: 380px;">
+        
+        <!-- Lado Izquierdo: Diagrama de Arquitectura Archify / Stack -->
+        <div style="background: rgba(15,23,42,0.8); border: 1px solid rgba(56,189,248,0.3); border-radius: 12px; padding: 14px; display: flex; flex-direction: column; justify-content: space-between; text-align: left;">
+          <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 6px;">
+            <strong style="color: #38bdf8; font-size: 13px;">DIAGRAMA ARCHIFY / STACK</strong>
+            <span style="font-size: 10px; background: rgba(16,185,129,0.2); color: #34d399; padding: 2px 6px; border-radius: 4px;">sdcc-network</span>
+          </div>
+
+          <div style="display: flex; flex-direction: column; gap: 8px;">
+            <!-- Gateway y Eureka -->
+            <div style="display: flex; gap: 8px;">
+              <div style="flex: 1.2; background: rgba(2,132,199,0.15); border: 1px solid #0284c7; border-radius: 8px; padding: 8px; text-align: center;">
+                <div style="color: #38bdf8; font-weight: 700; font-size: 12px;">⚡ Spring Cloud Gateway</div>
+                <div style="font-size: 10px; color: #cbd5e1;">:8080 · LoadBalancer</div>
+              </div>
+              <div style="flex: 1; background: rgba(16,185,129,0.1); border: 1px solid #10b981; border-radius: 8px; padding: 8px; text-align: center;">
+                <div style="color: #34d399; font-weight: 700; font-size: 12px;">🧭 Eureka Server</div>
+                <div style="font-size: 10px; color: #94a3b8;">:8761 · Discovery</div>
+              </div>
+            </div>
+
+            <!-- Microservicios: Order Service 1, Order Service 2 e INVENTORY -->
+            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px;">
+              <div id="arch-ord1" class="node-box" style="padding: 6px; font-size: 11px; text-align: center; border-color: #334155; transition: all 0.2s;">
+                <strong style="color: #34d399; font-size: 11px;">order-1</strong>
+                <div style="color: #94a3b8; font-size: 9px;">:8081 (UP)</div>
+              </div>
+              <div id="arch-ord2" class="node-box" style="padding: 6px; font-size: 11px; text-align: center; border-color: #334155; transition: all 0.2s;">
+                <strong style="color: #c084fc; font-size: 11px;">order-2</strong>
+                <div style="color: #94a3b8; font-size: 9px;">:8083 (UP)</div>
+              </div>
+              <div id="arch-inv" class="node-box" style="padding: 6px; font-size: 11px; text-align: center; border-color: #334155; transition: all 0.2s;">
+                <strong style="color: #fbbf24; font-size: 11px;">inventory</strong>
+                <div style="color: #94a3b8; font-size: 9px;">:8082 (Stock)</div>
+              </div>
+            </div>
+
+            <!-- Clúster PostgreSQL Replicado Sincronizado -->
+            <div style="background: rgba(0,0,0,0.3); border: 1px dashed rgba(255,255,255,0.15); border-radius: 8px; padding: 8px;">
+              <div style="font-size: 10px; color: #94a3b8; font-weight: 700; margin-bottom: 4px; display: flex; justify-content: space-between;">
+                <span>POSTGRESQL REPLICAS</span>
+                <span id="db-status-tag" style="color: #38bdf8;">SYNC BASH</span>
+              </div>
+              <div style="display: flex; gap: 6px; font-size: 10px;">
+                <div id="arch-db-primary" style="flex: 1; background: rgba(239,68,68,0.15); border: 2px solid #ef4444; border-radius: 6px; padding: 6px 2px; text-align: center; transition: all 0.2s;">
+                  <span style="color: #f87171; font-weight: 700;">Primary</span>:5435
+                  <div style="font-size: 8px; color: #fca5a5;">(POST Write)</div>
+                </div>
+                <div id="arch-db-rep1" style="flex: 1; background: rgba(56,189,248,0.15); border: 2px solid #0369a1; border-radius: 6px; padding: 6px 2px; text-align: center; transition: all 0.2s;">
+                  <span style="color: #38bdf8; font-weight: 700;">Réplica 1</span>:5433
+                  <div style="font-size: 8px; color: #7dd3fc;">(GET Read)</div>
+                </div>
+                <div id="arch-db-rep2" style="flex: 1; background: rgba(16,185,129,0.15); border: 2px solid #047857; border-radius: 6px; padding: 6px 2px; text-align: center; transition: all 0.2s;">
+                  <span style="color: #34d399; font-weight: 700;">Réplica 2</span>:5434
+                  <div style="font-size: 8px; color: #6ee7b7;">(GET Read)</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div style="font-size: 11px; color: #94a3b8;">
+            * Consultas GET enrutan por Round-Robin a las réplicas vía WAL streaming.
+          </div>
+        </div>
+
+        <!-- Lado Derecho: Terminal Multi-Script (GET / POST / BRUNO TESTS) -->
+        <div style="background: #05080f; border: 1px solid #1e293b; border-radius: 12px; padding: 12px; font-family: monospace; display: flex; flex-direction: column; justify-content: space-between; text-align: left; font-size: 11px;">
+          <!-- Pestañas Interactivas para probar los 3 scripts -->
+          <div style="border-bottom: 1px solid #1e293b; padding-bottom: 8px; display: flex; justify-content: space-between; align-items: center;">
+            <div style="display: flex; gap: 6px;">
+              <button id="tab-get" class="tab-btn active" style="padding: 3px 8px; font-size: 10px; background: #0284c7;" onclick="switchTerminalTab('get')">1. GET (Balanceo)</button>
+              <button id="tab-post" class="tab-btn" style="padding: 3px 8px; font-size: 10px; background: #1e293b;" onclick="switchTerminalTab('post')">2. POST (Primary)</button>
+              <button id="tab-bruno" class="tab-btn" style="padding: 3px 8px; font-size: 10px; background: #1e293b;" onclick="switchTerminalTab('bruno')">3. Bruno CLI Tests</button>
+            </div>
+            <span style="color: #34d399; font-size: 10px;">● FAST EXEC</span>
+          </div>
+
+          <!-- VISTA 1: GET LOAD BALANCER -->
+          <div id="view-get" class="terminal-tab-view" style="display: flex; flex-direction: column; flex: 1; margin-top: 6px;">
+            <div style="color: #38bdf8; margin-bottom: 4px;">$ ./scripts/experiments/watch-loadbalance.sh http://localhost:8080/api/orders 100 GET</div>
+            <div style="color: #94a3b8; display: grid; grid-template-columns: 35px 45px 55px 1.5fr 1fr; border-bottom: 1px solid #1e293b; padding-bottom: 2px; font-weight: 700;">
+              <span>#</span><span>Tipo</span><span>Estado</span><span>Instancia</span><span>Nodo BD</span>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 2px; flex: 1; margin-top: 3px;">
+              <div style="display: grid; grid-template-columns: 35px 45px 55px 1.5fr 1fr;"><span>1</span><span style="color: #38bdf8;">GET</span><span style="color: #34d399;">200</span><span style="color: #34d399;">order-service-1:8081</span><span style="color: #38bdf8;">REPLICA_1</span></div>
+              <div style="display: grid; grid-template-columns: 35px 45px 55px 1.5fr 1fr;"><span>2</span><span style="color: #38bdf8;">GET</span><span style="color: #34d399;">200</span><span style="color: #c084fc;">order-service-2:8083</span><span style="color: #818cf8;">REPLICA_2</span></div>
+              <div style="display: grid; grid-template-columns: 35px 45px 55px 1.5fr 1fr;"><span>3</span><span style="color: #38bdf8;">GET</span><span style="color: #34d399;">200</span><span style="color: #34d399;">order-service-1:8081</span><span style="color: #818cf8;">REPLICA_2</span></div>
+              <div style="display: grid; grid-template-columns: 35px 45px 55px 1.5fr 1fr;"><span>4</span><span style="color: #38bdf8;">GET</span><span style="color: #34d399;">200</span><span style="color: #c084fc;">order-service-2:8083</span><span style="color: #38bdf8;">REPLICA_1</span></div>
+              <div style="display: grid; grid-template-columns: 35px 45px 55px 1.5fr 1fr;"><span>5</span><span style="color: #38bdf8;">GET</span><span style="color: #34d399;">200</span><span style="color: #34d399;">order-service-1:8081</span><span style="color: #38bdf8;">REPLICA_1</span></div>
+            </div>
+            <div style="background: rgba(15,23,42,0.95); border: 1px solid rgba(56,189,248,0.3); border-radius: 6px; padding: 6px 10px; font-size: 10px; margin-top: 4px;">
+              <strong style="color: #38bdf8;">📊 P02 RECONCILIACIÓN (100 SOLICITUDES):</strong>
+              <div style="display: flex; justify-content: space-between; margin-top: 2px;">
+                <span>• order-1: <strong style="color: #34d399;">50 (50%)</strong></span>
+                <span>• order-2: <strong style="color: #c084fc;">50 (50%)</strong></span>
+                <span>• Réplica 1: <strong style="color: #38bdf8;">50</strong></span>
+                <span>• Réplica 2: <strong style="color: #818cf8;">50</strong></span>
+              </div>
+            </div>
+          </div>
+
+          <!-- VISTA 2: POST ESCRITURA EN PRIMARY -->
+          <div id="view-post" class="terminal-tab-view" style="display: none; flex-direction: column; flex: 1; margin-top: 6px;">
+            <div style="color: #fb923c; margin-bottom: 4px;">$ ./scripts/experiments/watch-loadbalance.sh http://localhost:8080/api/orders 4 POST</div>
+            <div style="color: #94a3b8; display: grid; grid-template-columns: 35px 45px 55px 1.5fr 1fr; border-bottom: 1px solid #1e293b; padding-bottom: 2px; font-weight: 700;">
+              <span>#</span><span>Tipo</span><span>Estado</span><span>Instancia Servidora</span><span>Nodo BD</span>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 3px; flex: 1; margin-top: 4px;">
+              <div style="display: grid; grid-template-columns: 35px 45px 55px 1.5fr 1fr;"><span>1</span><span style="color: #fb923c; font-weight: 700;">POST</span><span style="color: #34d399;">201</span><span style="color: #34d399;">order-service-1:8081</span><span style="color: #ef4444; font-weight: 800;">PRIMARY</span></div>
+              <div style="display: grid; grid-template-columns: 35px 45px 55px 1.5fr 1fr;"><span>2</span><span style="color: #fb923c; font-weight: 700;">POST</span><span style="color: #34d399;">201</span><span style="color: #c084fc;">order-service-2:8083</span><span style="color: #ef4444; font-weight: 800;">PRIMARY</span></div>
+              <div style="display: grid; grid-template-columns: 35px 45px 55px 1.5fr 1fr;"><span>3</span><span style="color: #fb923c; font-weight: 700;">POST</span><span style="color: #34d399;">201</span><span style="color: #34d399;">order-service-1:8081</span><span style="color: #ef4444; font-weight: 800;">PRIMARY</span></div>
+              <div style="display: grid; grid-template-columns: 35px 45px 55px 1.5fr 1fr;"><span>4</span><span style="color: #fb923c; font-weight: 700;">POST</span><span style="color: #34d399;">201</span><span style="color: #c084fc;">order-service-2:8083</span><span style="color: #ef4444; font-weight: 800;">PRIMARY</span></div>
+            </div>
+            <div style="background: rgba(15,23,42,0.95); border: 1px solid rgba(251,146,60,0.4); border-radius: 6px; padding: 6px 10px; font-size: 10px; margin-top: 4px;">
+              <strong style="color: #fb923c;">📝 ESCRITURAS ESTRICTAS EN PRIMARY:</strong>
+              <div style="color: #cbd5e1; margin-top: 2px;">
+                Los pedidos insertan en <code>PRIMARY</code> y descuentan stock. Las réplicas solo reciben datos mediante WAL streaming.
+              </div>
+            </div>
+          </div>
+
+          <!-- VISTA 3: BRUNO CLI TEST RESULTS -->
+          <div id="view-bruno" class="terminal-tab-view" style="display: none; flex-direction: column; flex: 1; margin-top: 6px;">
+            <div style="color: #4ade80; margin-bottom: 4px;">$ bru run tests/bruno/collection --env local</div>
+            <div style="color: #94a3b8; display: grid; grid-template-columns: 1.8fr 45px 1fr 45px 60px; border-bottom: 1px solid #1e293b; padding-bottom: 2px; font-weight: 700;">
+              <span>Test File</span><span>Tipo</span><span>Endpoint</span><span>Time</span><span>Status</span>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 2px; flex: 1; margin-top: 3px;">
+              <div style="display: grid; grid-template-columns: 1.8fr 45px 1fr 45px 60px;"><span>01-eureka-apps.bru</span><span style="color:#38bdf8">GET</span><span>:8761/eureka</span><span>16ms</span><span style="color:#34d399; font-weight:700">✓ PASS</span></div>
+              <div style="display: grid; grid-template-columns: 1.8fr 45px 1fr 45px 60px;"><span>02-crear-pedido.bru</span><span style="color:#fb923c">POST</span><span>:8080/orders</span><span>42ms</span><span style="color:#34d399; font-weight:700">✓ PASS</span></div>
+              <div style="display: grid; grid-template-columns: 1.8fr 45px 1fr 45px 60px;"><span>03-listar-pedidos.bru</span><span style="color:#38bdf8">GET</span><span>:8080/orders</span><span>18ms</span><span style="color:#34d399; font-weight:700">✓ PASS</span></div>
+              <div style="display: grid; grid-template-columns: 1.8fr 45px 1fr 45px 60px;"><span>04-lectura-critica.bru</span><span style="color:#38bdf8">GET</span><span>:8080/orders/{id}</span><span>12ms</span><span style="color:#34d399; font-weight:700">✓ PASS</span></div>
+              <div style="display: grid; grid-template-columns: 1.8fr 45px 1fr 45px 60px;"><span>05-stock-inventario.bru</span><span style="color:#38bdf8">GET</span><span>:8080/inventory</span><span>14ms</span><span style="color:#34d399; font-weight:700">✓ PASS</span></div>
+              <div style="display: grid; grid-template-columns: 1.8fr 45px 1fr 45px 60px;"><span>06-stock-insuficiente.bru</span><span style="color:#fb923c">POST</span><span>:8080/orders</span><span>22ms</span><span style="color:#34d399; font-weight:700">✓ PASS</span></div>
+            </div>
+            <div style="background: rgba(15,23,42,0.95); border: 1px solid rgba(74,222,128,0.4); border-radius: 6px; padding: 6px 10px; font-size: 10px; margin-top: 4px;">
+              <strong style="color: #4ade80;">🎉 BRUNO TEST RUNNER: 6/6 PASSED (0 FAILED)</strong>
+              <div style="color: #cbd5e1; margin-top: 2px;">
+                Validación de cabeceras, DTOs y rechazo de stock completadas con éxito.
+              </div>
+            </div>
+          </div>
+        </div>
+        </div>
+
+      </div>
+
+      <div style="width: 100%; display: flex; justify-content: space-between; font-size: 11px; color: #94a3b8; margin-top: 8px;">
+        <span>Script oficial: <code>scripts/experiments/test-p02-loadbalance.sh</code></span>
+        <span style="color: #34d399; font-weight: 700;">✓ Cabeceras verificadas: X-Instance-Id y X-Database-Node</span>
+      </div>
+    </div>
+
+    <!-- 3. ALLISON: TRANSACTIONS -->
+    <div id="allison" class="scene allison-scene">
+      <div>
+        <div class="badge badge-pink">Etapa 3 · Allison Reyes · Pruebas P04 y P05</div>
+        <h2 style="font-size: 32px; font-weight: 900; color: #f8fafc;">Transacciones Distribuidas y Reserva de Stock</h2>
+        <p style="color: #94a3b8; font-size: 15px;">Comunicación RPC Inter-servicio y Enrutamiento a PostgreSQL PRIMARY</p>
+      </div>
+
+      <div style="display: flex; align-items: center; justify-content: center; gap: 24px; width: 100%;">
+        <div class="node-box" style="width: 190px;">
+          <div style="font-size: 26px;">🧪</div>
+          <div style="font-weight: 700;">Bruno Collection</div>
+          <div style="font-size: 11px; color: #f472b6;">POST /api/orders</div>
+        </div>
+        <span style="color: #f472b6; font-size: 20px;">➔</span>
+        <div class="node-box" style="width: 210px; border-color: #38bdf8;">
+          <div style="font-size: 26px;">📦</div>
+          <strong style="color: #38bdf8;">Order Service</strong>
+          <div style="font-size: 11px; color: #94a3b8;">Valida & Coordina</div>
+        </div>
+        <span style="color: #a855f7; font-size: 20px;">➔</span>
+        <div class="node-box" style="width: 210px; border-color: #a855f7;">
+          <div style="font-size: 26px;">🏷️</div>
+          <strong style="color: #c084fc;">Inventory Service</strong>
+          <div style="font-size: 11px; color: #34d399;">Stock: 50 → 48</div>
+        </div>
+        <span style="color: #10b981; font-size: 20px;">➔</span>
+        <div class="node-box" style="width: 210px; border-color: #10b981;">
+          <div style="font-size: 26px;">🐘</div>
+          <strong style="color: #34d399;">postgres-primary</strong>
+          <div style="font-size: 11px; color: #34d399;"><code>X-Database-Node: PRIMARY</code></div>
+        </div>
+      </div>
+
+      <div style="display: flex; gap: 20px; width: 100%;">
+        <div style="flex: 1; background: rgba(15,23,42,0.7); padding: 12px; border-radius: 10px; font-size: 13px; text-align: left;">
+          <strong style="color: #f472b6;">P04 Stock Insuficiente:</strong> Si cantidad &gt; stock, Inventory rechaza con 400 Bad Request y no genera pedidos huérfanos.
+        </div>
+        <div style="flex: 1; background: rgba(15,23,42,0.7); padding: 12px; border-radius: 10px; font-size: 13px; text-align: left;">
+          <strong style="color: #34d399;">P05 Lectura Crítica:</strong> Cabecera <code>X-Consistency: critical</code> enruta directamente al Primary para evitar lag de replicación.
+        </div>
+      </div>
+    </div>
+
+    <!-- 4. ANDY: FAILOVER -->
+    <div id="andy" class="scene andy-scene">
+      <div>
+        <div class="badge badge-red">Etapa 4 · Andy Alejandro · Pruebas P03, P06 y P08</div>
+        <h2 style="font-size: 32px; font-weight: 900; color: #f8fafc;">Resiliencia y Conmutación por Fallo (Failover)</h2>
+        <p style="color: #94a3b8; font-size: 15px;">Inyección deliberada de fallos y reincorporación en caliente</p>
+      </div>
+
+      <div style="display: flex; gap: 30px; width: 100%; justify-content: center;">
+        <div class="node-box" style="flex: 1; text-align: left; border-color: #ef4444;">
+          <strong style="color: #f87171; font-size: 16px;">P03 · Fallo de Microservicio</strong>
+          <div style="font-size: 11px; color: #94a3b8; margin: 4px 0 10px;"><code>docker stop order-service-1</code></div>
+          <div class="node-box stopped-red" style="padding: 10px; margin-bottom: 8px; font-size: 12px; color: #fca5a5;">
+            order-service-1:8081 · STOPPED
+          </div>
+          <div class="node-box active-green" style="padding: 10px; font-size: 12px; color: #34d399;">
+            order-service-2:8083 · ABSORBE 100% TRÁFICO
+          </div>
+        </div>
+
+        <div class="node-box" style="flex: 1; text-align: left; border-color: #f59e0b;">
+          <strong style="color: #fbbf24; font-size: 16px;">P06 & P08 · Failover y Reincorporación BD</strong>
+          <div style="font-size: 11px; color: #94a3b8; margin: 4px 0 10px;"><code>docker stop postgres-replica1</code></div>
+          <div class="node-box stopped-red" style="padding: 10px; margin-bottom: 8px; font-size: 12px; color: #fca5a5;">
+            postgres-replica1 · DETENIDA
+          </div>
+          <div class="node-box active-green" style="padding: 10px; font-size: 12px; color: #34d399;">
+            postgres-replica2 · LECTURAS ACTIVAS (WAL STREAMING)
+          </div>
+        </div>
+      </div>
+
+      <div style="background: rgba(15,23,42,0.8); padding: 12px 24px; border-radius: 10px; width: 100%; display: flex; justify-content: space-between; font-size: 13px;">
+        <span>Comando de Verificación: <code>pg_stat_replication</code></span>
+        <span style="color: #34d399; font-weight: 700;">Estado de Réplicas: STREAMING (Asíncrono)</span>
+      </div>
+    </div>
+
+    <!-- 5. OUTRO -->
+    <div id="outro" class="scene outro-scene">
+      <h2 style="font-size: 36px; font-weight: 900; background: linear-gradient(to right, #34d399, #6ee7b7, #ffffff); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">
+        Conclusiones y Verificación Experimental
+      </h2>
+      <p style="color: #94a3b8; font-size: 17px; margin: 10px 0 25px;">Comportamiento en régimen estable y tolerancia a fallos</p>
+
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; max-width: 900px; width: 100%; margin-bottom: 25px; text-align: left;">
+        <div style="background: rgba(15,23,42,0.8); border: 1px solid rgba(52,211,153,0.3); border-radius: 10px; padding: 14px;">
+          <div style="color: #34d399; font-weight: 700; font-size: 14px;">✓ Tolerancia a Fallos Probada</div>
+          <div style="color: #cbd5e1; font-size: 12px; margin-top: 4px;">Continuidad del servicio ante caída de contenedores de app y réplicas BD.</div>
+        </div>
+        <div style="background: rgba(15,23,42,0.8); border: 1px solid rgba(56,189,248,0.3); border-radius: 10px; padding: 14px;">
+          <div style="color: #38bdf8; font-weight: 700; font-size: 14px;">✓ Ventana de Transición 503 → 200</div>
+          <div style="color: #cbd5e1; font-size: 12px; margin-top: 4px;">Comportamiento observado durante el reinicio de servicios antes de sincronizar en Eureka.</div>
+        </div>
+        <div style="background: rgba(15,23,42,0.8); border: 1px solid rgba(167,139,250,0.3); border-radius: 10px; padding: 14px;">
+          <div style="color: #a78bfa; font-weight: 700; font-size: 14px;">✓ Trazabilidad de Cabeceras HTTP</div>
+          <div style="color: #cbd5e1; font-size: 12px; margin-top: 4px;">Auditoría con X-Instance-Id y X-Database-Node (PRIMARY / REPLICA_1 / REPLICA_2).</div>
+        </div>
+        <div style="background: rgba(15,23,42,0.8); border: 1px solid rgba(251,191,36,0.3); border-radius: 10px; padding: 14px;">
+          <div style="color: #fbbf24; font-weight: 700; font-size: 14px;">✓ Equipo Participante</div>
+          <div style="color: #cbd5e1; font-size: 12px; margin-top: 4px;">Yandris Rivera Torres, Gino Bermúdez, Allison Reyes y Andy Alejandro.</div>
+        </div>
+      </div>
+
+      <div style="color: #94a3b8; font-size: 14px;">SDCC · Microservices with Gateway and Loadbalancer</div>
+    </div>
+  </div>
+
+  <script>
+    const sceneIds = ['intro', 'gino', 'allison', 'andy', 'outro'];
+    let autoTimer = null;
+    let currentIdx = 0;
+
+    function switchScene(id) {
+      if (autoTimer) { clearInterval(autoTimer); autoTimer = null; }
+      sceneIds.forEach(s => {
+        document.getElementById(s).classList.remove('active');
+      });
+      document.getElementById(id).classList.add('active');
+      
+      const buttons = document.querySelectorAll('.controls button');
+      buttons.forEach(b => b.classList.remove('active'));
+      const activeBtn = Array.from(buttons).find(b => b.getAttribute('onclick')?.includes(id));
+      if (activeBtn) activeBtn.classList.add('active');
+    }
+
+    function switchTerminalTab(tab) {
+      const views = ['view-get', 'view-post', 'view-bruno'];
+      const tabs = ['tab-get', 'tab-post', 'tab-bruno'];
+      views.forEach(v => {
+        const el = document.getElementById(v);
+        if (el) el.style.display = 'none';
+      });
+      tabs.forEach(t => {
+        const btn = document.getElementById(t);
+        if (btn) btn.style.background = '#1e293b';
+      });
+
+      const activeView = document.getElementById('view-' + tab);
+      const activeTabBtn = document.getElementById('tab-' + tab);
+      if (activeView) activeView.style.display = 'flex';
+      if (activeTabBtn) {
+        if (tab === 'get') activeTabBtn.style.background = '#0284c7';
+        if (tab === 'post') activeTabBtn.style.background = '#ea580c';
+        if (tab === 'bruno') activeTabBtn.style.background = '#16a34a';
+      }
+
+      // Sincronización visual en el diagrama de arquitectura
+      const pPrimary = document.getElementById('arch-db-primary');
+      const pRep1 = document.getElementById('arch-db-rep1');
+      const pRep2 = document.getElementById('arch-db-rep2');
+      const pInv = document.getElementById('arch-inv');
+      const pOrd1 = document.getElementById('arch-ord1');
+      const pOrd2 = document.getElementById('arch-ord2');
+
+      // Reset
+      [pPrimary, pRep1, pRep2, pInv, pOrd1, pOrd2].forEach(el => {
+        if (el) {
+          el.style.transform = 'scale(1)';
+          el.style.boxShadow = 'none';
+        }
+      });
+
+      if (tab === 'get') {
+        if (pRep1) { pRep1.style.borderColor = '#38bdf8'; pRep1.style.boxShadow = '0 0 15px rgba(56,189,248,0.7)'; pRep1.style.transform = 'scale(1.05)'; }
+        if (pRep2) { pRep2.style.borderColor = '#10b981'; pRep2.style.boxShadow = '0 0 15px rgba(16,185,129,0.7)'; pRep2.style.transform = 'scale(1.05)'; }
+        if (pOrd1) { pOrd1.style.borderColor = '#34d399'; pOrd1.style.boxShadow = '0 0 15px rgba(52,211,153,0.4)'; }
+      } else if (tab === 'post') {
+        if (pPrimary) { pPrimary.style.borderColor = '#ef4444'; pPrimary.style.boxShadow = '0 0 20px rgba(239,68,68,0.8)'; pPrimary.style.transform = 'scale(1.08)'; }
+        if (pInv) { pInv.style.borderColor = '#f59e0b'; pInv.style.boxShadow = '0 0 18px rgba(245,158,11,0.7)'; pInv.style.transform = 'scale(1.08)'; }
+        if (pOrd2) { pOrd2.style.borderColor = '#c084fc'; pOrd2.style.boxShadow = '0 0 15px rgba(192,132,252,0.4)'; }
+      } else if (tab === 'bruno') {
+        if (pPrimary) { pPrimary.style.borderColor = '#ef4444'; pPrimary.style.boxShadow = '0 0 12px rgba(239,68,68,0.5)'; }
+        if (pRep1) { pRep1.style.borderColor = '#38bdf8'; pRep1.style.boxShadow = '0 0 12px rgba(56,189,248,0.5)'; }
+        if (pInv) { pInv.style.borderColor = '#f59e0b'; pInv.style.boxShadow = '0 0 12px rgba(245,158,11,0.5)'; }
+      }
+    }
+
+    function playAuto() {
+      if (autoTimer) { clearInterval(autoTimer); autoTimer = null; return; }
+      currentIdx = 0;
+      switchScene(sceneIds[currentIdx]);
+      autoTimer = setInterval(() => {
+        currentIdx = (currentIdx + 1) % sceneIds.length;
+        switchScene(sceneIds[currentIdx]);
+      }, 5000);
+    }
+  </script>
+</body>
+</html>
