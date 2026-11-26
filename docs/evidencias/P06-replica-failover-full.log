@@ -1,0 +1,86 @@
+P06 — fallo de réplica postgres-replica1 (antes / durante / logs del selector)
+fecha=2026-11-25T21:18:28-05:00 url=http://localhost:8080/api/orders
+
+containers_before:
+postgres-primary	Up 4 minutes (healthy)
+postgres-replica1	Up 33 seconds (healthy)
+postgres-replica2	Up 4 minutes (healthy)
+
+phase=before
+request	elapsed_ms	http_status	instance_id	database_node
+1	23	200	order-service-2:8083	REPLICA_2
+2	303	200	order-service-1:8081	REPLICA_1
+3	580	200	order-service-2:8083	REPLICA_1
+4	857	200	order-service-1:8081	REPLICA_2
+5	1131	200	order-service-2:8083	REPLICA_2
+6	1408	200	order-service-1:8081	REPLICA_1
+7	1684	200	order-service-2:8083	REPLICA_1
+8	1960	200	order-service-1:8081	REPLICA_2
+9	2235	200	order-service-2:8083	REPLICA_2
+10	2511	200	order-service-1:8081	REPLICA_1
+summary_before: ok=10 errors=0 REPLICA_1=5 REPLICA_2=5
+
+docker stop postgres-replica1
+phase=during
+request	elapsed_ms	http_status	instance_id	database_node
+1	27	200	order-service-2:8083	REPLICA_1
+2	304	200	order-service-1:8081	REPLICA_2
+3	577	200	order-service-2:8083	REPLICA_2
+4	1856	200	order-service-1:8081	REPLICA_2
+5	2130	200	order-service-2:8083	REPLICA_2
+6	2406	200	order-service-1:8081	REPLICA_2
+7	2679	200	order-service-2:8083	REPLICA_2
+8	2955	200	order-service-1:8081	REPLICA_2
+9	3230	200	order-service-2:8083	REPLICA_2
+10	3507	200	order-service-1:8081	REPLICA_2
+11	3781	200	order-service-2:8083	REPLICA_2
+12	4057	200	order-service-1:8081	REPLICA_2
+13	4331	200	order-service-2:8083	REPLICA_2
+14	4608	200	order-service-1:8081	REPLICA_2
+15	4882	200	order-service-2:8083	REPLICA_2
+16	5159	200	order-service-1:8081	REPLICA_2
+17	5434	200	order-service-2:8083	REPLICA_2
+18	5710	200	order-service-1:8081	REPLICA_2
+19	5984	200	order-service-2:8083	REPLICA_2
+20	6260	200	order-service-1:8081	REPLICA_2
+21	6535	200	order-service-2:8083	REPLICA_2
+22	6811	200	order-service-1:8081	REPLICA_2
+23	7087	200	order-service-2:8083	REPLICA_2
+24	7365	200	order-service-1:8081	REPLICA_2
+25	7639	200	order-service-2:8083	REPLICA_2
+26	7917	200	order-service-1:8081	REPLICA_2
+27	8192	200	order-service-2:8083	REPLICA_2
+28	8468	200	order-service-1:8081	REPLICA_2
+29	8743	200	order-service-2:8083	REPLICA_2
+30	9020	200	order-service-1:8081	REPLICA_2
+31	9295	200	order-service-2:8083	REPLICA_2
+32	9570	200	order-service-1:8081	REPLICA_2
+33	9844	200	order-service-2:8083	REPLICA_2
+34	10120	200	order-service-1:8081	REPLICA_2
+35	10394	200	order-service-2:8083	REPLICA_2
+36	10670	200	order-service-1:8081	REPLICA_2
+37	10943	200	order-service-2:8083	REPLICA_2
+38	11222	200	order-service-1:8081	REPLICA_2
+39	11496	200	order-service-2:8083	REPLICA_2
+40	11771	200	order-service-1:8081	REPLICA_2
+summary_during: ok=40 errors=0 REPLICA_1=1 REPLICA_2=39
+
+stop_completed_ms=12024
+containers_during:
+postgres-primary	Up 4 minutes (healthy)
+postgres-replica1	Exited (0) 11 seconds ago
+postgres-replica2	Up 4 minutes (healthy)
+
+selector_logs (db.route y estado de réplicas desde 2026-11-26T02:18:31Z):
+[order-service-1] 2026-11-26T02:18:33.489Z  WARN [cid=467b9a3e-a5e4-4a52-a3a7-c54713b69814 inst=order-service-1:8081 db=REPLICA_1] 1 --- [order-service] [nio-8081-exec-4] c.d.order.datasource.RoutedReadExecutor  : db.route op=READ policy=ORDINARY node=REPLICA_1 attempt=1 result=FAILED error=DataAccessResourceFailureException durationMs=1003
+[order-service-1] 2026-11-26T02:18:33.489Z  WARN [cid=467b9a3e-a5e4-4a52-a3a7-c54713b69814 inst=order-service-1:8081 db=] 1 --- [order-service] [nio-8081-exec-4] c.d.o.d.health.ReplicaHealthRegistry     : replica.state name=REPLICA_1 from=UP to=DOWN reason=request-connection-failure lagMs=n/a
+[order-service-1] 2026-11-26T02:18:33.489Z  INFO [cid=467b9a3e-a5e4-4a52-a3a7-c54713b69814 inst=order-service-1:8081 db=] 1 --- [order-service] [nio-8081-exec-4] c.d.o.d.health.ReplicaHealthRegistry     : replica.rotation name=REPLICA_1 action=LEAVE consecutiveUp=0
+[order-service-2] 2026-11-26T02:18:33.243Z  WARN [cid= inst= db=] 1 --- [order-service] [   scheduling-1] c.d.o.d.health.ReplicaHealthRegistry     : replica.state name=REPLICA_1 from=UP to=DOWN reason=SQLTransientConnectionException(08003) lagMs=n/a
+[order-service-2] 2026-11-26T02:18:33.244Z  INFO [cid= inst= db=] 1 --- [order-service] [   scheduling-1] c.d.o.d.health.ReplicaHealthRegistry     : replica.rotation name=REPLICA_1 action=LEAVE consecutiveUp=0
+
+docker start postgres-replica1
+restored_health=healthy after_ms=5310
+containers_after:
+postgres-primary	Up 4 minutes (healthy)
+postgres-replica1	Up 5 seconds (healthy)
+postgres-replica2	Up 4 minutes (healthy)

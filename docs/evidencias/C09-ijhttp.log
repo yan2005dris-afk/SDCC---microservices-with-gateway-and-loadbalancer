@@ -1,0 +1,36 @@
+C09 — JetBrains HTTP Client CLI (imagen oficial jetbrains/intellij-http-client)
+Fecha: 2026-11-25
+Comando: docker run --rm --network host -v "$PWD/tests/http:/workdir" -v /tmp/ij:/report jetbrains/intellij-http-client --report=/report api-tests.http
+Resultado: 12 requests completed, 0 have failed tests — RUN SUCCESSFUL
+Informe XML: testsuite api-tests, tests=24 failures=0 errors=0 skip=0
+
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites tests="24" name="IntelliJ IDEA HTTP Client">
+  <testsuite tests="24" name="api-tests" failures="0" errors="0" skip="0">
+    <testcase classname="http.------------------------------------------------------------------------------_1" name="Response" time="0.576" />
+    <testcase classname="http.------------------------------------------------------------------------------_1" name="Response Handler" time="0.0" />
+    <testcase classname="http._2" name="Response" time="0.027" />
+    <testcase classname="http._2" name="Response Handler" time="0.0" />
+    <testcase classname="http.------------------------------------------------------------------------------_2" name="Response" time="1.329" />
+    <testcase classname="http.------------------------------------------------------------------------------_2" name="Response Handler" time="0.0" />
+    <testcase classname="http._4" name="Response" time="0.026" />
+    <testcase classname="http._4" name="Response Handler" time="0.0" />
+    <testcase classname="http.createOrderSuccess" name="Response" time="1.336" />
+    <testcase classname="http.createOrderSuccess" name="Response Handler" time="1.564" />
+    <testcase classname="http._6" name="Response" time="0.047" />
+    <testcase classname="http._6" name="Response Handler" time="0.0" />
+    <testcase classname="http.------------------------------------------------------------------------------_3" name="Response" time="0.059" />
+    <testcase classname="http.------------------------------------------------------------------------------_3" name="Response Handler" time="0.0" />
+    <testcase classname="http.------------------------------------------------------------------------------_4" name="Response" time="0.099" />
+    <testcase classname="http.------------------------------------------------------------------------------_4" name="Response Handler" time="0.0" />
+    <testcase classname="http._9" name="Response" time="0.043" />
+    <testcase classname="http._9" name="Response Handler" time="0.0" />
+    <testcase classname="http._10" name="Response" time="0.02" />
+    <testcase classname="http._10" name="Response Handler" time="0.0" />
+    <testcase classname="http.------------------------------------------------------------------------------_5" name="Response" time="0.009" />
+    <testcase classname="http.------------------------------------------------------------------------------_5" name="Response Handler" time="0.0" />
+    <testcase classname="http._12" name="Response" time="0.006" />
+    <testcase classname="http._12" name="Response Handler" time="0.0" />
+  </testsuite>
+</testsuites>
+
