@@ -1,0 +1,280 @@
+Verificación de la versión final — develop de85fcc, clon limpio, 2026-11-26
+Instalación según README: test -e .env || cp .env.example .env; docker compose up -d --build --wait --wait-timeout 300 → EXIT=0, 8 contenedores healthy
+
+=== Paso 4 README: semilla y replicación
+inventory_products: PROD-001..PROD-005 (50/30/100/75/40), reserved_stock=0
+pg_stat_replication: 2 x walreceiver streaming/async
+
+=== P01 Eureka
+API-GATEWAY=UP; ORDER-SERVICE: order-service-1:8081=UP, order-service-2:8083=UP; INVENTORY-SERVICE: inventory-service:8082=UP
+
+=== P04/P05/P07 con los ejemplos curl del README
+POST válido PROD-001 x2: 201, X-Database-Node=PRIMARY, totalAmount=3799.98 (unitPrice 1899.99 fijado por inventario), CONFIRMED, id=1
+POST sin stock x9999: 400 {"error":"Stock insuficiente"}
+GET /api/orders x4: 200, REPLICA_1, REPLICA_2, REPLICA_1, REPLICA_2
+GET /api/orders/1 con X-Consistency: critical: 200, PRIMARY
+
+=== P02 scripts/experiments/test-p02-loadbalance.sh
+P02 URL: http://localhost:8080/api/orders
+Solicitudes: 100
+request	http_status	instance_id	database_node	error
+
+Resumen
+attempts=100
+http_responses=100
+requests_without_response=0
+transport_errors=0
+http_errors=0
+header_errors=0
+request_reconciliation=100/100
+HTTP statuses:
+  200=100
+Instances:
+  order-service-1:8081=50
+  order-service-2:8083=50
+Database nodes:
+  REPLICA_1=50
+  REPLICA_2=50
+
+=== P03 scripts/experiments/test-p03-instance-failover.sh (DURING=80)
+P03 — fallo de instancia order-service-1 (antes / durante / después)
+fecha=2026-11-25T23:08:08-05:00 url=http://localhost:8080/api/orders
+
+readiness_gate: order-service-1=1 order-service-2=1
+
+phase=before
+request	elapsed_ms	http_status	instance_id	database_node
+1	26	200	order-service-2:8083	REPLICA_1
+2	301	200	order-service-1:8081	REPLICA_1
+3	577	200	order-service-2:8083	REPLICA_2
+4	894	200	order-service-1:8081	REPLICA_2
+5	1171	200	order-service-2:8083	REPLICA_1
+6	1446	200	order-service-1:8081	REPLICA_1
+7	1723	200	order-service-2:8083	REPLICA_2
+8	2000	200	order-service-1:8081	REPLICA_2
+9	2278	200	order-service-2:8083	REPLICA_1
+10	2558	200	order-service-1:8081	REPLICA_1
+11	2834	200	order-service-2:8083	REPLICA_2
+12	3112	200	order-service-1:8081	REPLICA_2
+13	3388	200	order-service-2:8083	REPLICA_1
+14	3664	200	order-service-1:8081	REPLICA_1
+15	3940	200	order-service-2:8083	REPLICA_2
+16	4218	200	order-service-1:8081	REPLICA_2
+17	4494	200	order-service-2:8083	REPLICA_1
+18	4771	200	order-service-1:8081	REPLICA_1
+19	5047	200	order-service-2:8083	REPLICA_2
+20	5321	200	order-service-1:8081	REPLICA_2
+summary_before: ok=20 errors=0
+
+docker stop order-service-1
+
+phase=during
+request	elapsed_ms	http_status	instance_id	database_node
+1	26	200	order-service-2:8083	REPLICA_1
+2	301	200	order-service-1:8081	REPLICA_1
+3	576	200	order-service-2:8083	REPLICA_2
+4	851	200	order-service-1:8081	REPLICA_2
+5	1127	200	order-service-2:8083	REPLICA_1
+6	1402	200	order-service-1:8081	REPLICA_1
+7	1677	200	order-service-2:8083	REPLICA_2
+8	1952	200	order-service-1:8081	REPLICA_2
+9	2227	200	order-service-2:8083	REPLICA_1
+10	2502	200	order-service-1:8081	REPLICA_1
+11	2777	200	order-service-2:8083	REPLICA_2
+12	3051	200	order-service-1:8081	REPLICA_2
+13	3327	200	order-service-2:8083	REPLICA_1
+14	3601	200	order-service-1:8081	REPLICA_1
+15	3883	200	order-service-2:8083	REPLICA_2
+16	4159	200	order-service-2:8083	REPLICA_1
+17	4434	200	order-service-2:8083	REPLICA_2
+18	4709	200	order-service-2:8083	REPLICA_1
+19	4985	200	order-service-2:8083	REPLICA_2
+20	5264	200	order-service-2:8083	REPLICA_1
+21	5539	200	order-service-2:8083	REPLICA_2
+22	5820	200	order-service-2:8083	REPLICA_1
+23	6097	200	order-service-2:8083	REPLICA_2
+24	6375	200	order-service-2:8083	REPLICA_1
+25	6653	200	order-service-2:8083	REPLICA_2
+26	6950	200	order-service-2:8083	REPLICA_1
+27	7225	200	order-service-2:8083	REPLICA_2
+28	7500	200	order-service-2:8083	REPLICA_1
+29	7776	200	order-service-2:8083	REPLICA_2
+30	8050	200	order-service-2:8083	REPLICA_1
+31	8324	200	order-service-2:8083	REPLICA_2
+32	8599	200	order-service-2:8083	REPLICA_1
+33	8876	200	order-service-2:8083	REPLICA_2
+34	9150	200	order-service-2:8083	REPLICA_1
+35	9426	200	order-service-2:8083	REPLICA_2
+36	9702	200	order-service-2:8083	REPLICA_1
+37	9976	200	order-service-2:8083	REPLICA_2
+38	10254	200	order-service-2:8083	REPLICA_1
+39	10529	200	order-service-2:8083	REPLICA_2
+40	10806	200	order-service-2:8083	REPLICA_1
+41	11081	200	order-service-2:8083	REPLICA_2
+42	11357	200	order-service-2:8083	REPLICA_1
+43	11632	200	order-service-2:8083	REPLICA_2
+44	11907	200	order-service-2:8083	REPLICA_1
+45	12181	200	order-service-2:8083	REPLICA_2
+46	12457	200	order-service-2:8083	REPLICA_1
+47	12733	200	order-service-2:8083	REPLICA_2
+48	13009	200	order-service-2:8083	REPLICA_1
+49	13284	200	order-service-2:8083	REPLICA_2
+50	13558	200	order-service-2:8083	REPLICA_1
+51	13833	200	order-service-2:8083	REPLICA_2
+52	14109	200	order-service-2:8083	REPLICA_1
+53	14384	200	order-service-2:8083	REPLICA_2
+54	14667	200	order-service-2:8083	REPLICA_1
+55	14942	200	order-service-2:8083	REPLICA_2
+56	15219	200	order-service-2:8083	REPLICA_1
+57	15493	200	order-service-2:8083	REPLICA_2
+58	15768	200	order-service-2:8083	REPLICA_1
+59	16044	200	order-service-2:8083	REPLICA_2
+60	16318	200	order-service-2:8083	REPLICA_1
+61	16593	200	order-service-2:8083	REPLICA_2
+62	16867	200	order-service-2:8083	REPLICA_1
+63	17143	200	order-service-2:8083	REPLICA_2
+64	17417	200	order-service-2:8083	REPLICA_1
+65	17692	200	order-service-2:8083	REPLICA_2
+66	17970	200	order-service-2:8083	REPLICA_1
+67	18250	200	order-service-2:8083	REPLICA_2
+68	18528	200	order-service-2:8083	REPLICA_1
+69	18807	200	order-service-2:8083	REPLICA_2
+70	19084	200	order-service-2:8083	REPLICA_1
+71	19359	200	order-service-2:8083	REPLICA_2
+72	19635	200	order-service-2:8083	REPLICA_1
+73	19914	200	order-service-2:8083	REPLICA_2
+74	20191	200	order-service-2:8083	REPLICA_1
+75	20470	200	order-service-2:8083	REPLICA_2
+76	20748	200	order-service-2:8083	REPLICA_1
+77	21027	200	order-service-2:8083	REPLICA_2
+78	21304	200	order-service-2:8083	REPLICA_1
+79	21580	200	order-service-2:8083	REPLICA_2
+80	21854	200	order-service-2:8083	REPLICA_1
+summary_during: ok=80 errors=0
+
+stop_completed_ms=22107
+
+docker start order-service-1
+recovery_container_healthy_ms=10856
+recovery_first_200_from_order-service-1_ms=14190
+
+phase=after
+request	elapsed_ms	http_status	instance_id	database_node
+1	14215	200	order-service-2:8083	REPLICA_1
+2	14498	200	order-service-1:8081	REPLICA_2
+3	14773	200	order-service-2:8083	REPLICA_2
+4	15049	200	order-service-1:8081	REPLICA_1
+5	15324	200	order-service-2:8083	REPLICA_1
+6	15601	200	order-service-1:8081	REPLICA_2
+7	15875	200	order-service-2:8083	REPLICA_2
+8	16152	200	order-service-1:8081	REPLICA_1
+9	16427	200	order-service-2:8083	REPLICA_1
+10	16704	200	order-service-1:8081	REPLICA_2
+11	16978	200	order-service-2:8083	REPLICA_2
+12	17256	200	order-service-1:8081	REPLICA_1
+13	17530	200	order-service-2:8083	REPLICA_1
+14	17806	200	order-service-1:8081	REPLICA_2
+15	18080	200	order-service-2:8083	REPLICA_2
+16	18356	200	order-service-1:8081	REPLICA_1
+17	18631	200	order-service-2:8083	REPLICA_1
+18	18907	200	order-service-1:8081	REPLICA_2
+19	19181	200	order-service-2:8083	REPLICA_2
+20	19458	200	order-service-1:8081	REPLICA_1
+summary_after: ok=20 errors=0
+
+
+=== P06 scripts/experiments/test-p06-replica-failover.sh
+P06 — fallo de réplica postgres-replica1 (antes / durante / logs del selector)
+fecha=2026-11-25T23:09:06-05:00 url=http://localhost:8080/api/orders
+
+containers_before:
+postgres-primary	Up 2 minutes (healthy)
+postgres-replica1	Up About a minute (healthy)
+postgres-replica2	Up About a minute (healthy)
+
+phase=before
+request	elapsed_ms	http_status	instance_id	database_node
+1	25	200	order-service-2:8083	REPLICA_1
+2	299	200	order-service-1:8081	REPLICA_2
+3	574	200	order-service-2:8083	REPLICA_2
+4	849	200	order-service-1:8081	REPLICA_1
+5	1123	200	order-service-2:8083	REPLICA_1
+6	1398	200	order-service-1:8081	REPLICA_2
+7	1674	200	order-service-2:8083	REPLICA_2
+8	1950	200	order-service-1:8081	REPLICA_1
+9	2224	200	order-service-2:8083	REPLICA_1
+10	2500	200	order-service-1:8081	REPLICA_2
+summary_before: ok=10 errors=0 REPLICA_1=5 REPLICA_2=5
+
+docker stop postgres-replica1
+phase=during
+request	elapsed_ms	http_status	instance_id	database_node
+1	26	200	order-service-2:8083	REPLICA_2
+2	1308	200	order-service-1:8081	REPLICA_2
+3	2591	200	order-service-2:8083	REPLICA_2
+4	2864	200	order-service-1:8081	REPLICA_2
+5	3138	200	order-service-2:8083	REPLICA_2
+6	3413	200	order-service-1:8081	REPLICA_2
+7	3687	200	order-service-2:8083	REPLICA_2
+8	4000	200	order-service-1:8081	REPLICA_2
+9	4274	200	order-service-2:8083	REPLICA_2
+10	4551	200	order-service-1:8081	REPLICA_2
+11	4825	200	order-service-2:8083	REPLICA_2
+12	5102	200	order-service-1:8081	REPLICA_2
+13	5377	200	order-service-2:8083	REPLICA_2
+14	5652	200	order-service-1:8081	REPLICA_2
+15	5925	200	order-service-2:8083	REPLICA_2
+16	6201	200	order-service-1:8081	REPLICA_2
+17	6475	200	order-service-2:8083	REPLICA_2
+18	6751	200	order-service-1:8081	REPLICA_2
+19	7025	200	order-service-2:8083	REPLICA_2
+20	7300	200	order-service-1:8081	REPLICA_2
+21	7574	200	order-service-2:8083	REPLICA_2
+22	7848	200	order-service-1:8081	REPLICA_2
+23	8126	200	order-service-2:8083	REPLICA_2
+24	8401	200	order-service-1:8081	REPLICA_2
+25	8675	200	order-service-2:8083	REPLICA_2
+26	8949	200	order-service-1:8081	REPLICA_2
+27	9224	200	order-service-2:8083	REPLICA_2
+28	9500	200	order-service-1:8081	REPLICA_2
+29	9774	200	order-service-2:8083	REPLICA_2
+30	10050	200	order-service-1:8081	REPLICA_2
+31	10325	200	order-service-2:8083	REPLICA_2
+32	10600	200	order-service-1:8081	REPLICA_2
+33	10873	200	order-service-2:8083	REPLICA_2
+34	11147	200	order-service-1:8081	REPLICA_2
+35	11421	200	order-service-2:8083	REPLICA_2
+36	11695	200	order-service-1:8081	REPLICA_2
+37	11969	200	order-service-2:8083	REPLICA_2
+38	12243	200	order-service-1:8081	REPLICA_2
+39	12517	200	order-service-2:8083	REPLICA_2
+40	12790	200	order-service-1:8081	REPLICA_2
+summary_during: ok=40 errors=0 REPLICA_1=0 REPLICA_2=40
+
+stop_completed_ms=13043
+containers_during:
+postgres-primary	Up 2 minutes (healthy)
+postgres-replica1	Exited (0) 12 seconds ago
+postgres-replica2	Up 2 minutes (healthy)
+
+selector_logs (db.route y estado de réplicas desde 2026-11-26T04:09:09Z):
+[order-service-1] 2026-11-26T04:09:10.783Z  WARN [cid= inst= db=] 1 --- [order-service] [   scheduling-1] c.d.o.d.health.ReplicaHealthRegistry     : replica.state name=REPLICA_1 from=UP to=DOWN reason=SQLTransientConnectionException(08001) lagMs=n/a
+[order-service-1] 2026-11-26T04:09:10.783Z  INFO [cid= inst= db=] 1 --- [order-service] [   scheduling-1] c.d.o.d.health.ReplicaHealthRegistry     : replica.rotation name=REPLICA_1 action=LEAVE consecutiveUp=0
+[order-service-1] 2026-11-26T04:09:11.007Z  WARN [cid=80f80238-61df-4b0d-8509-2d78346cfafd inst=order-service-1:8081 db=REPLICA_1] 1 --- [order-service] [nio-8081-exec-6] c.d.order.datasource.RoutedReadExecutor  : db.route op=READ policy=ORDINARY node=REPLICA_1 attempt=1 result=FAILED error=DataAccessResourceFailureException durationMs=1007
+[order-service-2] 2026-11-26T04:09:12.291Z  WARN [cid=663bcaec-9b95-4853-bf65-bb0d469d8ac1 inst=order-service-2:8083 db=REPLICA_1] 1 --- [order-service] [nio-8081-exec-6] c.d.order.datasource.RoutedReadExecutor  : db.route op=READ policy=ORDINARY node=REPLICA_1 attempt=1 result=FAILED error=DataAccessResourceFailureException durationMs=1008
+[order-service-2] 2026-11-26T04:09:12.291Z  WARN [cid=663bcaec-9b95-4853-bf65-bb0d469d8ac1 inst=order-service-2:8083 db=] 1 --- [order-service] [nio-8081-exec-6] c.d.o.d.health.ReplicaHealthRegistry     : replica.state name=REPLICA_1 from=UP to=DOWN reason=request-connection-failure lagMs=n/a
+[order-service-2] 2026-11-26T04:09:12.291Z  INFO [cid=663bcaec-9b95-4853-bf65-bb0d469d8ac1 inst=order-service-2:8083 db=] 1 --- [order-service] [nio-8081-exec-6] c.d.o.d.health.ReplicaHealthRegistry     : replica.rotation name=REPLICA_1 action=LEAVE consecutiveUp=0
+
+docker start postgres-replica1
+restored_health=healthy after_ms=5285
+containers_after:
+postgres-primary	Up 2 minutes (healthy)
+postgres-replica1	Up 5 seconds (healthy)
+postgres-replica2	Up 2 minutes (healthy)
+
+=== P08
+P08 (código final) — reingreso de postgres-replica1
+first_replica1_read_elapsed_ms=5281 requests=20
+health=healthy
+streaming|async
+streaming|async

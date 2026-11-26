@@ -942,6 +942,32 @@ HTML}\label{c21-sintaxis-de-los-diagramas-html}
   \textbf{Estado:} \textcolor{PassGreen}{\textbf{passed}}.
 \end{itemize}
 
+\section{Verificación sobre la versión final}\label{verificacion-final}
+
+Las mediciones de las secciones 3--5 se hicieron antes de que \texttt{develop}
+incorporara el precio fijado por inventario y la cabecera
+\texttt{Idempotency-Key}. Para confirmar que lo entregado funciona, se repitió
+la instalación y las pruebas sobre la versión final (\texttt{develop},
+commit \texttt{de85fcc}) desde un clon limpio, siguiendo solo el
+\texttt{README.md} (2026-11-26).
+
+\begin{itemize}
+\tightlist
+\item \textbf{Instalación:} \texttt{cp .env.example .env} y \texttt{docker compose up -d -{}-build -{}-wait}: los 8 contenedores \texttt{healthy}; semilla de 5 productos y 2 réplicas \texttt{streaming/async}.
+\item \textbf{P01:} Gateway, Inventory y las dos instancias de Orders \texttt{UP} en Eureka.
+\item \textbf{P02:} 100/100 HTTP 200; 50/50 por instancia y 50/50 por réplica; 0 errores.
+\item \textbf{P03:} antes 20/20, durante 80/80 y después 20/20 HTTP 200; \texttt{healthy} en 10,9\,s y primera respuesta de la instancia en 14,2\,s.
+\item \textbf{P04:} pedido válido 201 en \texttt{PRIMARY} con precio de inventario (1899,99 $\times$ 2 = 3799,98); sin stock 400.
+\item \textbf{P05:} lecturas ordinarias alternadas \texttt{REPLICA\_1}/\texttt{REPLICA\_2}.
+\item \textbf{P06:} 40/40 HTTP 200 con la réplica caída, todas desde \texttt{REPLICA\_2}; el selector la marcó \texttt{DOWN} y la sacó de rotación en ambas instancias.
+\item \textbf{P07:} lectura crítica del pedido recién creado servida por \texttt{PRIMARY}.
+\item \textbf{P08:} primera lectura servida por \texttt{REPLICA\_1} 5,3\,s después de arrancarla; 2 réplicas \texttt{streaming/async}.
+\item \textbf{Evidencia:} \texttt{docs/\codebreak{}evidencias/\codebreak{}smoke-\codebreak{}develop-\codebreak{}final.\codebreak{}log}.
+\end{itemize}
+
+Los resultados coinciden con las mediciones anteriores; el cambio de precio
+no altera el comportamiento distribuido.
+
 \section{Límites y cierre}\label{luxedmites-y-cierre}
 
 \begin{itemize}
