@@ -23,4 +23,4 @@ S3. Verificar sintaxis y ejemplos, incluido un ciclo exitoso y el manejo de erro
 ## Log
 
 - L1: Task scaffolded for slug "colecciones-medicion": Corregir colecciones y medición de solicitudes.
-- L2: S1–S3 verificadas con Bruno 6/6 y 13/13 aserciones; P02 registra 100 solicitudes y reconcilia el caso de transporte. La ejecución de `tests/http/api-tests.http` con `ijhttp` queda `not_run` porque esa CLI no está instalada; secuencia revisada y ciclo equivalente ejercitado con Bruno/cURL. Evidencia en `docs/plan/INFORME_P01_P08.md`.
+- L2: S1–S3 verificadas con Bruno 6/6 y 13/13 aserciones; P02 registra 100 solicitudes y reconcilia el caso de transporte. `tests/http/api-tests.http` se ejecutó con la CLI oficial `ijhttp` (imagen Docker `jetbrains/intellij-http-client`): 12/12 solicitudes, 0 fallos (`docs/evidencias/C09-ijhttp.log`). Evidencia en `Entregables/pdf/informe.pdf` (C08, C09).

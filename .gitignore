@@ -87,6 +87,7 @@ package-lock.json
 !docs/evidencias/C19-mvn-test.log
 !docs/evidencias/P03-instance-failover-full.log
 !docs/evidencias/P06-replica-failover-full.log
+!docs/evidencias/smoke-develop-final.log
 
 # Herramientas locales de agentes IA
 .gemini/
