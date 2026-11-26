@@ -619,7 +619,7 @@ JetBrains}\label{c09-ejecuciuxf3n-del-archivo-http-client-de-jetbrains}
   del \texttt{POST} de pedido.
 \item
   \textbf{Salida:} \texttt{docs/\codebreak{}evidencias/\codebreak{}C09-\codebreak{}ijhttp.\codebreak{}log}
-  (local; aún sin publicar en el commit evaluado).
+  (publicada en la rama \texttt{develop}).
 \item
   \textbf{Estado:} \textcolor{PassGreen}{\textbf{passed}}.
 \end{itemize}
@@ -810,12 +810,12 @@ entrega}\label{c17-guion-y-enlaces-de-entrega}
   \textbf{Requerido:} sí.
 \item
   \textbf{Qué verifica:} que el material para grabar el video esté listo.
-  No es el video ni un comando de la aplicación; el video se registra en
-  C18 y sigue pendiente. Se comprueba que:
+  No es el video ni un comando de la aplicación; el video publicado se
+  registra en C18. Se comprueba que:
   \begin{itemize}
   \tightlist
   \item \texttt{docs/plan/GUION\_VIDEO.md} existe, no está vacío y nombra a los cuatro integrantes (Yandris, Gino, Allison y Andy).
-  \item \texttt{README.md} enlaza el guion y conserva el marcador ``Pendiente de grabación con participación de todos los integrantes'', que se reemplazará por el enlace real al publicar el video.
+  \item \texttt{README.md} enlaza el guion y conservaba el marcador ``Pendiente de grabación\ldots'' hasta publicar el video; ya se reemplazó por el enlace real (C18).
   \end{itemize}
 \item
   \textbf{Cómo se ejecutó:} \texttt{test\ -s} sobre el guion y un script
@@ -843,19 +843,18 @@ real}\label{c18-grabaciuxf3n-publicaciuxf3n-y-enlace-real}
 \item
   \textbf{Specs:} \texttt{video-\codebreak{}demo\codebreak{}strativo/\codebreak{}S\codebreak{}3}.
 \item
-  \textbf{Requerido:} sí; es un entregable obligatorio. \textbf{Pendiente}: el equipo debe grabarlo y publicar el enlace.
+  \textbf{Requerido:} sí; es un entregable obligatorio.
 \item
-  \textbf{Comando:} no ejecutado; requiere grabación y decisión de
-  publicación del equipo.
+  \textbf{Enlace:} \url{https://youtu.be/Hf0oJhigeFc}, publicado en YouTube
+  (se reproduce en el navegador, sin descarga).
 \item
-  \textbf{Resultado:} enlace pendiente; el marcador del README se
-  conservó deliberadamente.
-\item
-  \textbf{Salida:}
-  \href{https://github.com/yan2005dris-afk/SDCC---microservices-with-gateway-and-loadbalancer/blob/70ee0a32947f29515b9d0ab2961b1314c0b0938c/README.md}{README.md},
+  \textbf{Cómo se verificó:} el enlace responde y es accesible
+  públicamente (consulta oEmbed de YouTube, HTTP 200), con el título
+  ``Microservicios con descubrimiento dinámico, balanceo de carga y
+  persistencia replicada''. El \texttt{README.md} enlaza el video en la
   sección ``Video Demostrativo''.
 \item
-  \textbf{Estado:} \textcolor{gray}{\textbf{not\_run}}.
+  \textbf{Estado:} \textcolor{PassGreen}{\textbf{passed}}.
 \end{itemize}
 
 \subsection{C19 --- CI y suite completa de
@@ -880,7 +879,7 @@ microservicios}\label{c19-ci-y-suite-completa-de-microservicios}
   Las pruebas de integración \texttt{*IT} (fase \texttt{verify}) no se
   ejecutaron en esta corrida.
 \item
-  \textbf{Salida:} \texttt{docs/\codebreak{}evidencias/\codebreak{}C19-\codebreak{}mvn-\codebreak{}test.\codebreak{}log} (local).
+  \textbf{Salida:} \texttt{docs/\codebreak{}evidencias/\codebreak{}C19-\codebreak{}mvn-\codebreak{}test.\codebreak{}log}.
 \item
   \textbf{Estado:} \textcolor{PassGreen}{\textbf{passed}}.
 \end{itemize}
@@ -952,7 +951,7 @@ HTML}\label{c21-sintaxis-de-los-diagramas-html}
 \item \textbf{Detección de réplicas:} la primera lectura que encuentra una réplica caída paga $\sim$1\,s de latencia extra antes del reintento (P06). La reincorporación tarda $\sim$7\,s por diseño, porque se exigen dos sondeos correctos (P08).
 \item \textbf{Alcance de la replicación:} es asíncrona; solo las lecturas marcadas \texttt{X-Consistency: critical} garantizan ver la última escritura. No hay promoción automática del primario: si cae, las escrituras fallan (fuera del alcance de la actividad).
 \item \textbf{Pruebas automatizadas:} \texttt{mvn test} pasa 124/124 (C19); las pruebas de integración \texttt{*IT} no se ejecutaron en esta corrida.
-\item \textbf{Pendientes de entrega:} el video no está grabado ni publicado (C18). Las evidencias de 2026-11-25 (C09, C19, P03 y P06 ampliados) están en local hasta que se publiquen en un commit.
+\item \textbf{Video:} publicado en \url{https://youtu.be/Hf0oJhigeFc} y enlazado desde el \texttt{README.md} (C18).
 \item \textbf{Mejoras posibles:} medir una caída abrupta con \texttt{docker kill}; ajustar la caché y el health-check del LoadBalancer para acortar la ventana de arranque; ejecutar las pruebas \texttt{*IT} en CI.
 \end{itemize}
 

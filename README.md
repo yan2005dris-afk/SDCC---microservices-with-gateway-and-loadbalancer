@@ -275,7 +275,7 @@ El proyecto incluye suites listas para ejecutar en [tests/http/api-tests.http](t
 
 ## 7. Video Demostrativo
 
-- **Enlace al Video:** *(Pendiente de grabación con participación de todos los integrantes)*
+- **Enlace al Video:** [https://youtu.be/Hf0oJhigeFc](https://youtu.be/Hf0oJhigeFc)
 - **Duración:** 3 a 5 minutos
 - **Guion y lista de tomas:** [docs/plan/GUION_VIDEO.md](docs/plan/GUION_VIDEO.md)
 - **Contenido del Video:**
